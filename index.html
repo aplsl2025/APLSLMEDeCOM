@@ -109,6 +109,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
+
+  <!-- Firebase (Compat SDK for single-file HTML) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 </head>
 <body>
   <div class="wrap">
@@ -476,6 +481,86 @@
     BASE_PRICE_TYPE: "PTR" // PTR/PTS/INST label (demo only)
   };
   // =============================
+  // FIREBASE (Firestore) - Database Connection
+  // =============================
+  // 1) Paste your Firebase Web App config below (Project Settings -> Your apps -> Config)
+  // NOTE: Firebase apiKey is OK to be public; security is enforced by Firestore Rules.
+  const FIREBASE_CONFIG = {
+    apiKey: "PASTE_API_KEY",
+    authDomain: "PASTE_AUTH_DOMAIN",
+    projectId: "PASTE_PROJECT_ID",
+    storageBucket: "PASTE_STORAGE_BUCKET",
+    messagingSenderId: "PASTE_SENDER_ID",
+    appId: "PASTE_APP_ID"
+  };
+
+  // 2) Turn ON/OFF database mode
+  const USE_FIREBASE_DB = true; // set false to use only local storage
+
+  let db = null;
+  function initFirebase(){
+    if(!USE_FIREBASE_DB) return;
+    try{
+      // firebase-app-compat provides global "firebase"
+      if(!FIREBASE_CONFIG || !FIREBASE_CONFIG.projectId || FIREBASE_CONFIG.projectId.startsWith("PASTE_")){
+        console.warn("Firebase config not set. Using local storage.");
+        return;
+      }
+      if(!firebase.apps.length){
+        firebase.initializeApp(FIREBASE_CONFIG);
+      }
+      db = firebase.firestore();
+    }catch(e){
+      console.warn("Firebase init failed. Using local storage.", e);
+      db = null;
+    }
+  }
+
+  async function db_getProducts(){
+    if(!db) return null;
+    const snap = await db.collection("products").get();
+    const products = [];
+    snap.forEach(doc=> products.push({ id: doc.id, ...doc.data() }));
+    return products;
+  }
+
+  async function db_saveOrder(orderPayload){
+    if(!db) return false;
+    await db.collection("orders").add({
+      ...orderPayload,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  }
+
+  async function db_upsertUser(userPayload){
+    if(!db) return false;
+    // Store by mobile as document id to avoid duplicates
+    const mobile = String(userPayload.mobile || "").trim();
+    if(!mobile) return false;
+    await db.collection("users").doc(mobile).set({
+      ...userPayload,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+    return true;
+  }
+
+  async function db_seedProductsIfEmpty(seedList){
+    if(!db) return false;
+    const snap = await db.collection("products").limit(1).get();
+    if(!snap.empty) return false;
+    const batch = db.batch();
+    seedList.forEach(p=>{
+      const id = p.id || ("P" + Math.floor(Math.random()*90000 + 10000));
+      const ref = db.collection("products").doc(id);
+      const { id:_, ...rest } = { ...p, id };
+      batch.set(ref, rest);
+    });
+    await batch.commit();
+    return true;
+  }
+
+  // =============================
   // AREAS BY STATE (edit as needed)
   // =============================
   const AREAS_BY_STATE = {
@@ -594,7 +679,8 @@
   function save(key, obj){ _setItem(key, JSON.stringify(obj)); }
 
   function initStorage(){
-    const prods = load(K_PRODUCTS, null);
+    initFirebase();
+const prods = load(K_PRODUCTS, null);
     if(!prods || (Array.isArray(prods) && prods.length===0)){
       save(K_PRODUCTS, SEED_PRODUCTS);
     }
@@ -606,6 +692,11 @@
     if(!users){ save(K_USERS, []); }
     const cart = load(K_CART, null);
     if(!cart){ save(K_CART, []); }
+  
+    // If Firebase is configured, seed initial products into Firestore (only if empty)
+    if(db){
+      db_seedProductsIfEmpty(SEED_PRODUCTS).catch(()=>{});
+    }
   }
 
   function setMsg(el, text, type){
@@ -708,6 +799,8 @@
     }
     users.push({ mobile, pass, role, bizName, gstin, dlno, city, area, address, approved:true, createdAt:Date.now() });
     save(K_USERS, users);
+    // Also store/merge user in Firestore (optional)
+    db_upsertUser({ mobile, role, bizName, gstin, dlno, city, area, address, approved:true }).catch(()=>{});
     setMsg(msg,"Account created! Now click Login.", "ok");
   }
 
@@ -748,6 +841,22 @@
   // =============================
   // PRODUCTS (STORE VIEW)
   // =============================
+  
+  let PRODUCTS_CACHE = null;
+  async function getProductsSmart(){
+    // Prefer Firestore if available
+    if(db){
+      try{
+        const p = await db_getProducts();
+        if(Array.isArray(p) && p.length){ PRODUCTS_CACHE = p; return p; }
+      }catch(e){ console.warn("Firestore product fetch failed", e); }
+    }
+    // Fallback to local storage
+    const local = load(K_PRODUCTS, []);
+    PRODUCTS_CACHE = local;
+    return local;
+  }
+
   function productMatches(p, q){
     if(!q) return true;
     const s = (p.brand+" "+p.company+" "+p.strength).toLowerCase();
@@ -758,7 +867,6 @@
   function renderPreview(){
     const roleSel = document.getElementById("role");
     const role = roleSel ? roleSel.value : "retailer";
-    const products = load(K_PRODUCTS, []);
     const tbody = document.getElementById("previewRows");
     if(!tbody) return;
     tbody.innerHTML = "";
@@ -779,14 +887,15 @@
     });
   }
 
-function renderProducts(){
+async function renderProducts(){
     const s = getSession();
     if(!s) return;
 
-    const q = $("search").value.trim();
+    const products = await getProductsSmart();
+const q = $("search").value.trim();
     const av = $("availability").value;
 
-    const products = load(K_PRODUCTS, []);
+    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
     const rows = products
       .filter(p => productMatches(p,q))
       .filter(p => av==="all" ? true : (av==="available" ? p.status==="available" : p.status==="soon"));
@@ -898,7 +1007,7 @@ function renderProducts(){
   function buildOrderText(){
     const s = getSession();
     const cart = load(K_CART, []);
-    const products = load(K_PRODUCTS, []);
+    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
     const baseType = currentBaseType();
     const discounts = currentDiscounts();
     const po = $("poNote").value.trim();
@@ -973,7 +1082,7 @@ function renderProducts(){
     if(!s || s.isAdmin) return;
 
     const cart = load(K_CART, []);
-    const products = load(K_PRODUCTS, []);
+    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
     const wrap = $("cartList");
 
     if(cart.length===0){
@@ -1094,12 +1203,15 @@ function renderProducts(){
   // =============================
   // ORDER SENDERS
   // =============================
-  function sendWhatsApp(){
+  async function sendWhatsApp(){
     const s = getSession();
     if(!s) return;
 
     const wa = $("waNumber").value.trim() || SETTINGS.DEFAULT_WA;
-    const { text } = buildOrderText();
+    const built = buildOrderText();
+    const text = built.text;
+    // Save order to Firestore (optional)
+    db_saveOrder({ orderId: built.orderId, channel:'whatsapp', buyer: s.bizName, mobile: s.mobile, role: s.role, state: s.city, area: s.area||'', address: s.address||'', orderText: text }).catch(()=>{});
 
     // normalize wa number to digits (keep country code)
     const digits = wa.replace(/[^\d]/g,"");
@@ -1109,12 +1221,15 @@ function renderProducts(){
     setMsg($("orderMsg"),"Opened WhatsApp with order message.", "ok");
   }
 
-  function sendEmail(){
+  async function sendEmail(){
     const s = getSession();
     if(!s) return;
 
     const toEmail = $("toEmail").value.trim() || SETTINGS.DEFAULT_EMAIL;
-    const { text } = buildOrderText();
+    const built = buildOrderText();
+    const text = built.text;
+    // Save order to Firestore (optional)
+    db_saveOrder({ orderId: built.orderId, channel:'whatsapp', buyer: s.bizName, mobile: s.mobile, role: s.role, state: s.city, area: s.area||'', address: s.address||'', orderText: text }).catch(()=>{});
 
     $("orderTextField").value = text;
 
@@ -1128,8 +1243,8 @@ function renderProducts(){
   // =============================
   // ADMIN
   // =============================
-  function renderAdmin(){
-    const products = load(K_PRODUCTS, []);
+  async function renderAdmin(){
+    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
     $("basePriceType").value = currentBaseType();
 
     const discounts = currentDiscounts();
@@ -1153,7 +1268,7 @@ function renderProducts(){
   }
 
   function loadProductToEditor(id){
-    const products = load(K_PRODUCTS, []);
+    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
     const p = products.find(x=>x.id===id);
     if(!p) return;
     $("pId").value = p.id;
@@ -1194,7 +1309,7 @@ function renderProducts(){
     if(!brand || !company || !strength) return alert("Brand, Company, Strength are required.");
     if(!id) id = "P" + Math.floor(Math.random()*90000 + 10000);
 
-    const products = load(K_PRODUCTS, []);
+    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
     const existing = products.find(p=>p.id===id);
     const obj = { id, brand, company, strength, pack, type, gst, basePrice, status };
 
@@ -1204,6 +1319,13 @@ function renderProducts(){
       products.push(obj);
     }
     save(K_PRODUCTS, products);
+    PRODUCTS_CACHE = products;
+    // Also save to Firestore if configured
+    if(db){
+      db.collection("products").doc(String(id)).set({
+        brand, company, strength, pack, type, gst, basePrice, status
+      }, { merge:true }).then(()=>{}).catch(()=>{});
+    }
     renderAdmin();
     alert("Saved.");
   }
@@ -1217,6 +1339,8 @@ function renderProducts(){
     let products = load(K_PRODUCTS, []);
     products = products.filter(p=>p.id!==id);
     save(K_PRODUCTS, products);
+    PRODUCTS_CACHE = products;
+    if(db){ db.collection("products").doc(String(id)).delete().then(()=>{}).catch(()=>{}); }
     $("pId").value=""; $("pBrand").value=""; $("pCompany").value=""; $("pStrength").value="";
     $("pPack").value=""; $("pGst").value=""; $("pPrice").value="";
     renderAdmin();
@@ -1236,7 +1360,7 @@ function renderProducts(){
     if(!s) return;
 
     const cart = load(K_CART, []);
-    const products = load(K_PRODUCTS, []);
+    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
 
     if(cart.length === 0){
       setMsg($("orderMsg"),"Cart is empty. Add items first.", "bad");
