@@ -28,7 +28,7 @@
     .topbar h1{margin:0;font-size:18px;letter-spacing:.2px}
     .pill{background:rgba(255,255,255,.18);padding:6px 10px;border-radius:999px;font-size:12px}
     .grid{display:grid;gap:14px;margin-top:14px}
-    .grid-2{grid-template-columns:1fr}
+    .grid-2{grid-template-columns:1.2fr .8fr}
     @media(max-width:960px){.grid-2{grid-template-columns:1fr}}
     .card{
       background:var(--card);border:1px solid var(--border);border-radius:16px;
@@ -80,35 +80,7 @@
     /* Ensure table doesn't shrink columns too much */
     table{min-width:980px}
 
-  
-    /* Compact Qty Selector */
-    .qty-box{
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:4px;
-    }
-    .qty-btn{
-      width:28px;
-      height:28px;
-      border-radius:6px;
-      border:1px solid #ccc;
-      background:#f8f9fa;
-      cursor:pointer;
-      font-weight:bold;
-    }
-    .qty-value{
-      width:36px;
-      text-align:center;
-      font-weight:600;
-    }
-
   </style>
-
-  <!-- PDF Invoice Generation -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-
 </head>
 <body>
   <div class="wrap">
@@ -148,10 +120,6 @@
               <input id="mobile" type="tel" placeholder="e.g., 98487090212" />
             </div>
             <div>
-              <label>Email ID</label>
-              <input id="email" type="email" placeholder="e.g., abc@gmail.com" />
-            </div>
-            <div>
               <label>Password</label>
               <input id="password" type="password" placeholder="Create or enter password" />
             </div>
@@ -187,7 +155,7 @@
             </div>
             <div>
               <label>Delivery Area</label>
-              <select id="area"><option value="">Select area</option><option>Ahmedabad - Bopal</option><option>Ahmedabad - Shela</option><option>Ahmedabad - Prahlad Nagar</option><option>Ahmedabad - Satellite</option><option>Ahmedabad - Thaltej</option><option>Ahmedabad - Vastrapur</option><option>Ahmedabad - Maninagar</option><option>Ahmedabad - Naranpura</option><option>Ahmedabad - Navrangpura</option><option>Ahmedabad - Paldi</option><option>Ahmedabad - Gota</option><option>Ahmedabad - Chandkheda</option><option>Ahmedabad - South Bopal</option><option>Ahmedabad - Nikol</option><option>Ahmedabad - Vejalpur</option><option>Ahmedabad - SG Highway</option></select>
+              <select id="area"><option value="">Select area</option></select>
             </div>
             <div>
               <label>Full Address (Flat/Street/Landmark)</label>
@@ -196,57 +164,12 @@
           </div>
 
           <div class="btnrow">
-            <button class="btn" id="btnSignup" type="button">Create Account</button>
-            <button class="btn2" id="btnLogin" type="button">Login</button>
-            <button class="ghost" id="btnAdminLogin" type="button">Admin Login</button>
+            <button class="btn" id="btnSignup">Create Account</button>
+            <button class="btn2" id="btnLogin">Login</button>
+            <button class="ghost" id="btnAdminLogin">Admin Login</button>
           </div>
-          <div style="margin-top:10px; display:flex; justify-content:flex-end;">
-            <button type="button" class="link" id="btnForgot" style="background:none;border:none;color:#11799A;cursor:pointer;text-decoration:underline;font-weight:600;">
-              Forgot Password?
-            </button>
-          </div>
-
-          <div class="card" id="forgotPanel" style="display:none; margin-top:12px; padding:14px; border-radius:14px;">
-            <div class="row" style="display:grid; gap:10px;">
-              <input type="email" id="fpEmail" placeholder="Registered Email ID">
-              <input type="tel" id="fpMobile" placeholder="Registered Mobile Number">
-              <input type="password" id="fpNewPass" placeholder="New Password (min 4 chars)">
-              <input type="password" id="fpNewPass2" placeholder="Confirm New Password">
-              <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
-                <button type="button" class="btn" id="btnResetPass">Reset Password</button>
-                <button type="button" class="btn ghost" id="btnCancelReset">Cancel</button>
-              </div>
-              <div class="msg" id="fpMsg" style="display:none;"></div>
-              <div class="mini" style="opacity:.85">
-                Note: Password reset works only if your <b>Email + Mobile</b> match an existing account in the <b>users</b> sheet.
-              </div>
-            </div>
-          </div>
-
 
           <div class="msg hide" id="authMsg"></div>
-          <div class="msg" style="margin-top:12px">
-            <b>Medicines & Rates (Preview)</b>
-            <div class="mini">Rates shown as per selected Role discount. Login required to add to cart.</div>
-          </div>
-
-          <div style="margin-top:10px; overflow:auto; max-height:260px; border-radius:14px; border:1px solid var(--border); padding:10px; background:#fcfdff">
-            <table>
-              <thead>
-                <tr>
-                  <th>Brand</th>
-                  <th>Company</th>
-                  <th>Strength / Composition</th>
-                  <th>Pack</th>
-                  <th>Type</th>
-                  <th>GST%</th>
-                  <th>Rate (Net)</th>
-                </tr>
-              </thead>
-              <tbody id="previewRows"></tbody>
-            </table>
-          </div>
-
 
           <hr style="border:0;border-top:1px solid var(--border);margin:14px 0">
           <div class="note">
@@ -408,46 +331,11 @@
 
           <div id="cartList" class="note" style="margin-top:10px">Your cart is empty.</div>
 
-          
           <div style="margin-top:10px" class="msg">
-            <div class="split">
-              <div><b>Subtotal (Taxable Value)</b></div>
-              <div style="font-weight:800">INR <span id="subTotal">0.00</span></div>
-            </div>
-            <div class="split" style="margin-top:6px">
-              <div><b>Total GST</b></div>
-              <div style="font-weight:800">INR <span id="gstTotal">0.00</span></div>
-            </div>
-
-            <div id="gstSplitBox" style="margin-top:8px; border-top:1px dashed var(--border); padding-top:8px">
-              <div class="split">
-                <div class="mini">CGST</div>
-                <div class="mini">INR <b id="cgstAmt">0.00</b></div>
-              </div>
-              <div class="split" style="margin-top:4px">
-                <div class="mini">SGST</div>
-                <div class="mini">INR <b id="sgstAmt">0.00</b></div>
-              </div>
-              <div class="split hide" id="igstRow" style="margin-top:4px">
-                <div class="mini">IGST</div>
-                <div class="mini">INR <b id="igstAmt">0.00</b></div>
-              </div>
-            </div>
-
-            <div style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px" class="split">
-              <div style="font-size:14px"><b>Grand Total</b></div>
-              <div style="font-size:20px;font-weight:900">INR <span id="grandTotal">0.00</span></div>
-            </div>
-
-            <div class="mini" style="margin-top:6px">
-              Tax split: Gujarat = CGST + SGST. Other states = IGST (auto when activated).
-            </div>
+            <div><b>Total (Approx.)</b> <span class="mini">(excl. shipping)</span></div>
+            <div style="font-size:20px;font-weight:800;margin-top:4px">INR <span id="grandTotal">0.00</span></div>
+            <div class="mini">GST included per product line for demo display only.</div>
           </div>
-
-          <div class="btnrow">
-            <button class="ghost" id="btnPdf">Generate GST Invoice PDF</button>
-          </div>
-
 
           <label>Purchase Order Note (optional)</label>
           <textarea id="poNote" placeholder="Any notes: preferred delivery time, payment terms, urgent, etc."></textarea>
@@ -494,8 +382,6 @@
   // =============================
   // SETTINGS (edit these)
   // =============================
-  const SHEETDB_API = "https://sheetdb.io/api/v1/oq0xux451r2tn";
-
   const SETTINGS = {
     ADMIN_PIN: "2580",
     SERVICE_CITY_ONLY: "Gujarat",         // enforce city restriction
@@ -543,7 +429,7 @@
     if(!areaSel) return;
 
     const list = AREAS_BY_STATE[state] || AREAS_BY_STATE["Other"] || [];
-    const current = (preselectValue !== undefined && preselectValue !== null) ? preselectValue : "";
+    const current = preselectValue ?? "";
 
     // clear
     areaSel.innerHTML = "";
@@ -574,24 +460,9 @@
   // =============================
   // STORAGE KEYS
   // =============================
-
-  // =============================
-  // STORAGE (localStorage fallback for file:// restricted browsers)
-  // =============================
-  const __MEM_STORE__ = {};
-  function _getItem(k){
-    try { return localStorage.getItem(k); } catch(e){ return (__MEM_STORE__[k] ?? null); }
-  }
-  function _setItem(k, v){
-    try { localStorage.setItem(k, v); } catch(e){ __MEM_STORE__[k] = v; }
-  }
-  function _removeItem(k){
-    try { localStorage.removeItem(k); } catch(e){ delete __MEM_STORE__[k]; }
-  }
-
   const K_USERS = "b2b_users_v1";
   const K_SESSION = "b2b_session_v1";
-  const K_PRODUCTS = "b2b_products_v2";
+  const K_PRODUCTS = "b2b_products_v1";
   const K_CART = "b2b_cart_v1";
   const K_DISCOUNTS = "b2b_discounts_v1";
   const K_BASETYPE = "b2b_basetype_v1";
@@ -616,130 +487,96 @@
   const nowId = ()=> "ORD-" + Date.now().toString().slice(-8);
 
   function load(key, fallback){
-    const v = _getItem(key);
+    const v = localStorage.getItem(key);
     if(!v) return fallback;
     try{ return JSON.parse(v); }catch(e){ return fallback; }
   }
-  function save(key, obj){ _setItem(key, JSON.stringify(obj)); }
+  function save(key, obj){ localStorage.setItem(key, JSON.stringify(obj)); }
 
-  // =============================
-  // SHEETDB (Google Sheets backend)
-  // =============================
-  async function sheetGet(sheetName){
-    const res = await fetch(`${SHEETDB_API}?sheet=${encodeURIComponent(sheetName)}`);
-    if(!res.ok) throw new Error(`SheetDB GET failed: ${sheetName}`);
-    return res.json();
+  function initStorage(){
+    const prods = load(K_PRODUCTS, null);
+    if(!prods){ save(K_PRODUCTS, SEED_PRODUCTS); }
+    const discounts = load(K_DISCOUNTS, null);
+    if(!discounts){ save(K_DISCOUNTS, SETTINGS.DEFAULT_DISCOUNTS); }
+    const baseType = localStorage.getItem(K_BASETYPE);
+    if(!baseType){ localStorage.setItem(K_BASETYPE, SETTINGS.BASE_PRICE_TYPE); }
+    const users = load(K_USERS, null);
+    if(!users){ save(K_USERS, []); }
+    const cart = load(K_CART, null);
+    if(!cart){ save(K_CART, []); }
   }
 
-  async function sheetPost(sheetName, rows){
-    const res = await fetch(`${SHEETDB_API}?sheet=${encodeURIComponent(sheetName)}`, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ data: rows })
-    });
-    if(!res.ok) throw new Error(`SheetDB POST failed: ${sheetName}`);
-    return res.json();
+  function setMsg(el, text, type){
+    el.classList.remove("hide","ok","bad");
+    el.classList.add(type==="ok" ? "ok" : "bad");
+    el.textContent = text;
   }
 
-  async function syncProductsFromSheet(){
-    const rows = await sheetGet("products");
-    const products = rows.map(r => ({
-      id: r.id,
-      brand: r.brand,
-      company: r.company,
-      strength: r.strength,
-      pack: r.pack,
-      type: r.type,
-      gst: Number(r.gst || 0),
-      basePrice: Number(r.basePrice || 0),
-      status: (r.status || "available").toLowerCase(),
-      price_retailer: Number(r.price_retailer || 0),
-      price_wholesaler: Number(r.price_wholesaler || 0),
-      price_stockist: Number(r.price_stockist || 0),
-      price_doctor: Number(r.price_doctor || 0),
-      price_hospital: Number(r.price_hospital || 0),
-      price_partner: Number(r.price_partner || 0),
-      mrp: Number(r.mrp || 0)
-    }));
-    if(products.length){ save(K_PRODUCTS, products); }
-    return products;
+  function hideMsg(el){ el.classList.add("hide"); el.textContent=""; el.classList.remove("ok","bad"); }
+
+  function getSession(){ return load(K_SESSION, null); }
+  function setSession(s){ save(K_SESSION, s); }
+  function clearSession(){ localStorage.removeItem(K_SESSION); }
+
+  function currentDiscounts(){ return load(K_DISCOUNTS, SETTINGS.DEFAULT_DISCOUNTS); }
+  function currentBaseType(){ return localStorage.getItem(K_BASETYPE) || SETTINGS.BASE_PRICE_TYPE; }
+
+  function calcPrice(product, role){
+    const discounts = currentDiscounts();
+    const d = Number(discounts[role] ?? 0);
+    const base = Number(product.basePrice || 0);
+    const net = base * (1 - d/100);
+    return { base, discount:d, net };
   }
 
-  async function fetchUsersFromSheet(){
-    const rows = await sheetGet("users");
-    // normalize
-    return rows.map(r => ({
-      mobile: String(r.mobile || "").trim(),
-      email: String(r.email || "").trim(),
-      pass: String(r.pass || "").trim(),
-      role: String(r.role || "").trim(),
-      bizName: String(r.bizName || "").trim(),
-      gstin: String(r.gstin || "").trim(),
-      dlno: String(r.dlno || "").trim(),
-      city: String(r.city || "").trim(),
-      area: String(r.area || "").trim(),
-      address: String(r.address || "").trim(),
-      approved: String(r.approved || "").toLowerCase() === "true" || String(r.approved || "") === "1"
-    }));
+  function pillUpdate(){
+    const s = getSession();
+    $("pillStatus").textContent = s ? `Logged in: ${s.role.toUpperCase()} • ${s.mobile}` : "Not logged in";
   }
 
-  async function createUserInSheet(userObj){
-    // IMPORTANT: Sheet headers must match these keys
-    await sheetPost("users", [{
-      mobile: userObj.mobile,
-      email: userObj.email || "",
-      pass: userObj.pass,
-      role: userObj.role,
-      bizName: userObj.bizName,
-      gstin: userObj.gstin || "",
-      dlno: userObj.dlno || "",
-      city: userObj.city,
-      area: userObj.area || "",
-      address: userObj.address || "",
-      approved: userObj.approved ? "TRUE" : "FALSE"
-    }]);
-  }
-
-  async function saveOrderToSheet(orderPayload){
-    await sheetPost("orders", [orderPayload]);
-  }
-
-  async function sheetPatchByColumn(sheetName, columnName, value, dataObj){
-    const url = `${SHEETDB_API}/${encodeURIComponent(columnName)}/${encodeURIComponent(value)}?sheet=${encodeURIComponent(sheetName)}`;
-    const res = await fetch(url, {
-      method: "PATCH",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ data: dataObj })
-    });
-    if(!res.ok) throw new Error(`SheetDB PATCH failed: ${sheetName}.${columnName}=${value}`);
-    return res.json();
-  }
-
-  async function resetPasswordWithSheet(email, mobile, newPass){
-    const users = await fetchUsersFromSheet();
-    const u = users.find(x => x.mobile === mobile && (x.email || "").toLowerCase() === email.toLowerCase());
-    if(!u) return { ok:false, message:"No account found with this Email + Mobile." };
-    await sheetPatchByColumn("users", "mobile", mobile, { pass: newPass });
-    return { ok:true, message:"Password updated successfully. Please login." };
-  }
-
-  function adminLogin(){
-    const pin = prompt('Enter Admin PIN');
-    if(pin === null) return;
-    if(String(pin).trim() !== String(SETTINGS.ADMIN_PIN)){
-      setMsg($("authMsg"), 'Invalid Admin PIN.', 'bad');
-      return;
+  function showView(){
+    const s = getSession();
+    const isAdmin = s && s.isAdmin;
+    $("viewAuth").classList.toggle("hide", !!s);
+    $("viewStore").classList.toggle("hide", !s || isAdmin);
+    $("viewAdmin").classList.toggle("hide", !isAdmin);
+    $("viewCartLocked").classList.toggle("hide", !!s && !isAdmin);
+    $("viewCart").classList.toggle("hide", !s || isAdmin);
+    if(isAdmin){
+      document.getElementById("viewCartLocked").innerHTML = `<h2>Cart</h2><div class="msg">Admin mode - cart is disabled. Use Logout to return to user view.</div>`;
     }
-    // admin session
-    setSession({ isAdmin:true, bizName:'ADMIN', role:'admin', mobile:'', email:'' });
-    setMsg($("authMsg"), 'Admin login successful.', 'ok');
-    setTimeout(()=>{ hideMsg($("authMsg")); showView(); }, 200);
+
+    if(s && !isAdmin){
+      $("who").textContent = `${s.bizName} (${s.role}) • ${s.city}${s.area ? ", " + s.area : ""}`;
+      // Ensure area dropdown matches selected state and keeps saved area
+      if(document.getElementById("city")){
+        document.getElementById("city").value = s.city || document.getElementById("city").value;
+        populateAreasForState(document.getElementById("city").value, s.area || "");
+      }
+      $("roleTag").textContent = s.role;
+      $("roleTag").className = "tag";
+      if(s.role==="partner") $("roleTag").classList.add("off");
+      $("waNumber").value = $("waNumber").value || SETTINGS.DEFAULT_WA;
+      $("toEmail").value = $("toEmail").value || SETTINGS.DEFAULT_EMAIL;
+      renderProducts();
+      renderCart();
+    }
+    if(isAdmin){
+      renderAdmin();
+    }
+    pillUpdate();
   }
 
-  async function signup(){
+  // =============================
+  // AUTH
+  // =============================
+  function validateState(city){
+    return city === SETTINGS.SERVICE_CITY_ONLY;
+  }
+
+  function signup(){
     const role = $("role").value;
     const mobile = $("mobile").value.trim();
-    const email = ($("email")?.value || "").trim().toLowerCase();
     const pass = $("password").value.trim();
     const bizName = $("bizName").value.trim();
     const gstin = $("gstin").value.trim();
@@ -752,9 +589,6 @@
     hideMsg(msg);
 
     if(!mobile || mobile.length < 10) return setMsg(msg,"Enter a valid mobile number.", "bad");
-    if(!email) return setMsg(msg,"Email is required.", "bad");
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if(!emailOk) return setMsg(msg,"Enter a valid email address.", "bad");
     if(!pass || pass.length < 4) return setMsg(msg,"Password must be at least 4 characters.", "bad");
     if(!bizName) return setMsg(msg,"Enter business/shop name.", "bad");
     if(!address) return setMsg(msg,"Enter delivery address.", "bad");
@@ -766,54 +600,27 @@
       return setMsg(msg,"Select delivery area (Ahmedabad).", "bad");
     }
 
-    // Unique email + mobile check (SheetDB first, fallback local)
-    let exists = false;
-    try{
-      const usersSheet = await fetchUsersFromSheet();
-      exists = usersSheet.some(u => (u.mobile === mobile) || ((u.email||"").toLowerCase() === email));
-    }catch(e){
-      const usersLocal = load(K_USERS, []);
-      exists = usersLocal.some(u => (u.mobile === mobile) || (String(u.email||"").toLowerCase() === email));
+    const users = load(K_USERS, []);
+    if(users.find(u=>u.mobile===mobile)){
+      return setMsg(msg,"Account already exists. Please login.", "bad");
     }
-    if(exists) return setMsg(msg,"Account already exists with this mobile or email. Please login.", "bad");
-
-    const newUser = { mobile, email, pass, role, bizName, gstin, dlno, city, area, address, approved:true };
-    try{
-      await createUserInSheet(newUser);
-    }catch(e){
-      // fallback local only
-      const users = load(K_USERS, []);
-      users.push({ ...newUser, createdAt: Date.now() });
-      save(K_USERS, users);
-    }
-
+    users.push({ mobile, pass, role, bizName, gstin, dlno, city, area, address, approved:true, createdAt:Date.now() });
+    save(K_USERS, users);
     setMsg(msg,"Account created! Now click Login.", "ok");
   }
 
-  async function login(){
+  function login(){
     const role = $("role").value;
-    const email = ($("email")?.value || "").trim().toLowerCase();
+    const mobile = $("mobile").value.trim();
     const pass = $("password").value.trim();
     const msg = $("authMsg");
     hideMsg(msg);
 
-    if(!email) return setMsg(msg,"Email is required.", "bad");
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if(!emailOk) return setMsg(msg,"Enter a valid email address.", "bad");
-    if(!pass) return setMsg(msg,"Password is required.", "bad");
-
-    let u = null;
-    try{
-      const usersSheet = await fetchUsersFromSheet();
-      u = usersSheet.find(x => ((x.email||"").toLowerCase() === email) && x.pass === pass);
-    }catch(e){}
-    if(!u){
-      const users = load(K_USERS, []);
-      u = users.find(x => (String(x.email||"").toLowerCase() === email) && x.pass === pass) || null;
-    }
-    if(!u) return setMsg(msg,"Invalid email or password.", "bad");
-    if(String(u.role||"").trim() !== role) return setMsg(msg,"Role mismatch. Select correct Business Type.", "bad");
-    if(u.approved === false) return setMsg(msg,"Your account is pending approval.", "bad");
+    const users = load(K_USERS, []);
+    const u = users.find(x=>x.mobile===mobile && x.pass===pass);
+    if(!u) return setMsg(msg,"Invalid login. Check mobile/password or create account.", "bad");
+    if(u.role !== role) return setMsg(msg,"Role mismatch. Select the correct Business Type (Role).", "bad");
+    if(!u.approved) return setMsg(msg,"Your account is pending approval.", "bad");
     if(!validateState(u.city)) return setMsg(msg,`Service currently active only in Gujarat.`, "bad");
 
     setSession({ ...u, isAdmin:false });
@@ -821,54 +628,164 @@
     setTimeout(()=>{ hideMsg(msg); showView(); }, 250);
   }
 
-  function initStorage(){
-    const prods = load(K_PRODUCTS, null);
-    if(!prods || (Array.isArray(prods) && prods.length===0)){
-      save(K_PRODUCTS, SEED_PRODUCTS);
+  function adminLogin(){
+    const pin = prompt("Enter Admin PIN:");
+    if(pin === null) return;
+    if(String(pin).trim() !== SETTINGS.ADMIN_PIN){
+      return setMsg($("authMsg"),"Wrong Admin PIN.", "bad");
     }
+    setSession({ isAdmin:true, role:"admin", mobile:"ADMIN", bizName:"Admin", city:SETTINGS.SERVICE_CITY_ONLY });
+    showView();
+  }
+
+  function logout(){
+    clearSession();
+    showView();
+  }
+
+  // =============================
+  // PRODUCTS (STORE VIEW)
+  // =============================
+  function productMatches(p, q){
+    if(!q) return true;
+    const s = (p.brand+" "+p.company+" "+p.strength).toLowerCase();
+    return s.includes(q.toLowerCase());
+  }
+
+  function renderProducts(){
+    const s = getSession();
+    if(!s) return;
+
+    const q = $("search").value.trim();
+    const av = $("availability").value;
+
+    const products = load(K_PRODUCTS, []);
+    const rows = products
+      .filter(p => productMatches(p,q))
+      .filter(p => av==="all" ? true : (av==="available" ? p.status==="available" : p.status==="soon"));
+
+    const tbody = $("productRows");
+    tbody.innerHTML = "";
+
+    rows.forEach(p=>{
+      const pr = calcPrice(p, s.role);
+      const statusTag = p.status==="available"
+        ? `<span class="tag">Available</span>`
+        : `<span class="tag soon">Coming Soon</span>`;
+
+      const disabled = p.status!=="available" ? "disabled" : "";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${p.brand}<div class="mini">${statusTag}</div></td>
+        <td>${p.company}</td>
+        <td>${p.strength}</td>
+        <td>${p.pack}</td>
+        <td>${p.type}</td>
+        <td>${p.gst}%</td>
+        <td>
+          <div class="price">INR ${money(pr.net)} + GST</div>
+          <div class="mini">Base INR ${money(pr.base)} • Disc ${pr.discount}%</div>
+        </td>
+        <td>
+          <input class="qty-input" type="number" min="1" step="1" value="1" id="qty_${p.id}" ${disabled} />
+        </td>
+        <td>
+          <button class="btn" ${disabled} data-add="${p.id}">Add</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // wire add buttons
+    [...tbody.querySelectorAll("button[data-add]")].forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-add");
+        const qty = Number($("qty_"+id).value || 1);
+        addToCart(id, qty);
+      });
+    });
+  }
+
+  // =============================
+  // CART
+  // =============================
+  function addToCart(productId, qty){
+    const cart = load(K_CART, []);
+    const existing = cart.find(i=>i.productId===productId);
+    if(existing) existing.qty += qty;
+    else cart.push({ productId, qty });
+    save(K_CART, cart);
+    renderCart();
+    setMsg($("orderMsg"),"Added to cart.", "ok");
+    setTimeout(()=>hideMsg($("orderMsg")), 900);
+  }
+
+  function removeFromCart(productId){
+    let cart = load(K_CART, []);
+    cart = cart.filter(i=>i.productId!==productId);
+    save(K_CART, cart);
+    renderCart();
+  }
+
+  function updateCartQty(productId, qty){
+    const cart = load(K_CART, []);
+    const item = cart.find(i=>i.productId===productId);
+    if(!item) return;
+    item.qty = Math.max(1, qty);
+    save(K_CART, cart);
+    renderCart();
+  }
+
+  function clearCart(){
+    save(K_CART, []);
+    renderCart();
+  }
+
+  function buildOrderText(){
+    const s = getSession();
+    const cart = load(K_CART, []);
+    const products = load(K_PRODUCTS, []);
+    const baseType = currentBaseType();
+    const discounts = currentDiscounts();
+    const po = $("poNote").value.trim();
+    const orderId = nowId();
+
+    let lines = [];
+    lines.push(`APLSL B2B Medicine Order`);
+    lines.push(`Order ID: ${orderId}`);
+    lines.push(`Date: ${new Date().toLocaleString()}`);
+    lines.push(``);
+    lines.push(`Buyer: ${s.bizName}`);
+    lines.push(`Role: ${s.role}`);
+    lines.push(`Mobile: ${s.mobile}`);
+    if(s.gstin) lines.push(`GSTIN: ${s.gstin}`);
+    if(s.dlno) lines.push(`DL No: ${s.dlno}`);
+    lines.push(`Delivery: ${s.city}${s.area? ", "+s.area:""}`);
+    lines.push(`Address: ${s.address}`);
+    lines.push(``);
+    lines.push(`Pricing: Base ${baseType} | Discount: ${Number(discounts[s.role] ?? 0)}%`);
     lines.push(``);
     lines.push(`Items:`);
 
-    let subTotal = 0;
-    let gstTotal = 0;
-
+    let total = 0;
     cart.forEach((ci, idx)=>{
       const p = products.find(x=>x.id===ci.productId);
       if(!p) return;
       const pr = calcPrice(p, s.role);
-      const taxable = pr.net * ci.qty;
-      const gstAmt = taxable * ((p.gst||0)/100);
-      const lineTotal = taxable + gstAmt;
-      subTotal += taxable;
-      gstTotal += gstAmt;
-
-      lines.push(`${idx+1}. ${p.brand} (${p.type}) - ${p.strength} | Pack ${p.pack} | Qty ${ci.qty} | MRP INR ${money(p.mrp||0)} | Your Rate INR ${money(pr.net)} | Taxable INR ${money(taxable)} | GST ${p.gst||0}% (INR ${money(gstAmt)}) | Total INR ${money(lineTotal)}`);
+      const lineTotal = (pr.net * (1 + (p.gst||0)/100)) * ci.qty;
+      total += lineTotal;
+      lines.push(`${idx+1}. ${p.brand} (${p.type}) - ${p.strength} | Pack ${p.pack} | Qty ${ci.qty} | INR ${money(pr.net)} = INR ${money(lineTotal)}`);
     });
 
     lines.push(``);
-    const grandTotal = subTotal + gstTotal;
-
-    const isGujarat = (s && s.city === "Gujarat");
-    const cgst = isGujarat ? gstTotal/2 : 0;
-    const sgst = isGujarat ? gstTotal/2 : 0;
-    const igst = isGujarat ? 0 : gstTotal;
-
-    lines.push(`Subtotal (Taxable): INR ${money(subTotal)}`);
-    lines.push(`GST Total: INR ${money(gstTotal)}`);
-    if(isGujarat){
-      lines.push(`CGST: INR ${money(cgst)} | SGST: INR ${money(sgst)}`);
-    } else {
-      lines.push(`IGST: INR ${money(igst)}`);
-    }
-    lines.push(`Grand Total: INR ${money(grandTotal)}`);
+    lines.push(`Total (Approx.): INR ${money(total)}`);
     if(po) {
       lines.push(``);
       lines.push(`PO Note: ${po}`);
     }
     lines.push(``);
     lines.push(`- Sent from APLSL B2B Portal`);
-
-    return { text: lines.join("\n"), totals: { subTotal, gstTotal, grandTotal }, orderId };
+    return { text: lines.join("\n"), total, orderId };
   }
 
   function renderCart(){
@@ -909,7 +826,7 @@
           <div class="row" style="margin-top:8px">
             <div>
               <label style="margin-top:0">Qty</label>
-              <input type="number" min="0" step="1" value="${ci.qty}" data-qty="${p.id}">
+              <input type="number" min="1" step="1" value="${ci.qty}" data-qty="${p.id}">
             </div>
             <div>
               <label style="margin-top:0">Line Total</label>
@@ -922,49 +839,9 @@
 
     html += `</div>`;
     wrap.innerHTML = html;
+    $("grandTotal").textContent = money(total);
 
-    // Totals breakdown
-    let subTotal = 0;
-    let gstTotal = 0;
-
-    cart.forEach(ci=>{
-      const p = products.find(x=>x.id===ci.productId);
-      if(!p) return;
-      const pr = calcPrice(p, s.role);
-      const taxable = pr.net * ci.qty;
-      const gstAmt = taxable * ((p.gst||0)/100);
-      subTotal += taxable;
-      gstTotal += gstAmt;
-    });
-
-    const grand = subTotal + gstTotal;
-
-    const subEl = document.getElementById("subTotal");
-    const gstEl = document.getElementById("gstTotal");
-    const grandEl = document.getElementById("grandTotal");
-    if(subEl) subEl.textContent = money(subTotal);
-    if(gstEl) gstEl.textContent = money(gstTotal);
-    if(grandEl) grandEl.textContent = money(grand);
-
-    // GST split (Gujarat => CGST+SGST; else IGST)
-    const isGujarat = (s.city === "Gujarat");
-    const cgst = isGujarat ? gstTotal/2 : 0;
-    const sgst = isGujarat ? gstTotal/2 : 0;
-    const igst = isGujarat ? 0 : gstTotal;
-
-    const cgstEl = document.getElementById("cgstAmt");
-    const sgstEl = document.getElementById("sgstAmt");
-    const igstEl = document.getElementById("igstAmt");
-    const igstRow = document.getElementById("igstRow");
-
-    if(cgstEl) cgstEl.textContent = money(cgst);
-    if(sgstEl) sgstEl.textContent = money(sgst);
-    if(igstEl) igstEl.textContent = money(igst);
-    if(igstRow) igstRow.classList.toggle("hide", isGujarat);
-
-    // Also keep old variable for compatibility
-    total = grand;
-// wire events
+    // wire events
     [...wrap.querySelectorAll("button[data-remove]")].forEach(btn=>{
       btn.addEventListener("click", ()=> removeFromCart(btn.getAttribute("data-remove")));
     });
@@ -978,70 +855,29 @@
   // =============================
   // ORDER SENDERS
   // =============================
-  async function sendWhatsApp(){
+  function sendWhatsApp(){
     const s = getSession();
     if(!s) return;
 
     const wa = $("waNumber").value.trim() || SETTINGS.DEFAULT_WA;
-    const built = buildOrderText();
+    const { text } = buildOrderText();
 
-    // Save order to Google Sheet (best-effort)
-    try{
-      const payload = {
-        orderId: built.orderId,
-        date: new Date().toISOString(),
-        buyerMobile: s.mobile,
-        buyerName: s.bizName,
-        role: s.role,
-        city: s.city,
-        area: s.area || "",
-        address: s.address || "",
-        items: built.text,
-        subTotal: document.getElementById("subTotal")?.textContent || "0",
-        gstTotal: document.getElementById("gstTotal")?.textContent || "0",
-        grandTotal: document.getElementById("grandTotal")?.textContent || "0",
-        poNote: ($("poNote")?.value || "").trim()
-      };
-      await saveOrderToSheet(payload);
-    }catch(e){ console.warn(e); }
-
+    // normalize wa number to digits (keep country code)
     const digits = wa.replace(/[^\d]/g,"");
-    const url = `https://wa.me/${digits}?text=${encodeURIComponent(built.text)}`;
+    const url = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");
 
     setMsg($("orderMsg"),"Opened WhatsApp with order message.", "ok");
   }
 
-
-
-  async function sendEmail(){
+  function sendEmail(){
     const s = getSession();
     if(!s) return;
 
     const toEmail = $("toEmail").value.trim() || SETTINGS.DEFAULT_EMAIL;
-    const built = buildOrderText();
+    const { text } = buildOrderText();
 
-    // Save order to Google Sheet (best-effort)
-    try{
-      const payload = {
-        orderId: built.orderId,
-        date: new Date().toISOString(),
-        buyerMobile: s.mobile,
-        buyerName: s.bizName,
-        role: s.role,
-        city: s.city,
-        area: s.area || "",
-        address: s.address || "",
-        items: built.text,
-        subTotal: document.getElementById("subTotal")?.textContent || "0",
-        gstTotal: document.getElementById("gstTotal")?.textContent || "0",
-        grandTotal: document.getElementById("grandTotal")?.textContent || "0",
-        poNote: ($("poNote")?.value || "").trim()
-      };
-      await saveOrderToSheet(payload);
-    }catch(e){ console.warn(e); }
-
-    $("orderTextField").value = built.text;
+    $("orderTextField").value = text;
 
     const form = $("emailForm");
     form.action = `https://formsubmit.co/${encodeURIComponent(toEmail)}`;
@@ -1050,7 +886,9 @@
     setMsg($("orderMsg"),"Email tab opened (FormSubmit). If you are using it first time, it may ask to activate.", "ok");
   }
 
-
+  // =============================
+  // ADMIN
+  // =============================
   function renderAdmin(){
     const products = load(K_PRODUCTS, []);
     $("basePriceType").value = currentBaseType();
@@ -1091,7 +929,7 @@
   }
 
   function saveAdminSettings(){
-    _setItem(K_BASETYPE, $("basePriceType").value);
+    localStorage.setItem(K_BASETYPE, $("basePriceType").value);
     const d = safeJson($("discountJson").value.trim(), null);
     if(!d || typeof d !== "object"){
       alert("Discount JSON invalid. Example: {\"retailer\":0,\"wholesaler\":3}");
@@ -1150,228 +988,29 @@
     alert("Admin panel saved. Please Logout and login as a user to test store flow.");
   }
 
-  
-  // =============================
-  // GST INVOICE PDF (Client-side)
-  // =============================
-  function generateInvoicePDF(){
-    const s = getSession();
-    if(!s) return;
-
-    const cart = load(K_CART, []);
-    const products = load(K_PRODUCTS, []);
-
-    if(cart.length === 0){
-      setMsg($("orderMsg"),"Cart is empty. Add items first.", "bad");
-      return;
-    }
-
-    const { text, orderId } = buildOrderText(); // also gives orderId
-    // Compute totals
-    let subTotal = 0, gstTotal = 0;
-    const rows = [];
-    cart.forEach((ci, idx)=>{
-      const p = products.find(x=>x.id===ci.productId);
-      if(!p) return;
-      const pr = calcPrice(p, s.role);
-      const taxable = pr.net * ci.qty;
-      const gstAmt = taxable * ((p.gst||0)/100);
-      const lineTotal = taxable + gstAmt;
-      subTotal += taxable;
-      gstTotal += gstAmt;
-
-      rows.push([
-        String(idx+1),
-        p.brand,
-        p.type,
-        p.pack || "",
-        String(ci.qty),
-        money(pr.net),
-        money(taxable),
-        `${p.gst||0}%`,
-        money(gstAmt),
-        money(lineTotal)
-      ]);
-    });
-    const grandTotal = subTotal + gstTotal;
-
-    const isGujarat = (s.city === "Gujarat");
-    const cgst = isGujarat ? gstTotal/2 : 0;
-    const sgst = isGujarat ? gstTotal/2 : 0;
-    const igst = isGujarat ? 0 : gstTotal;
-
-    // jsPDF UMD
-    const jspdf = window.jspdf;
-    if(!jspdf || !jspdf.jsPDF){
-      alert("PDF library failed to load. Please check your internet or CDN access.");
-      return;
-    }
-    const doc = new jspdf.jsPDF("p","mm","a4");
-
-    // Header
-    doc.setFontSize(14);
-    doc.text("TAX INVOICE (GST)", 105, 14, { align:"center" });
-    doc.setFontSize(10);
-    doc.text(`Invoice No: ${orderId}`, 14, 22);
-    doc.text(`Date: ${new Date().toLocaleString()}`, 14, 27);
-
-    // Seller details (edit here if needed)
-    doc.setFontSize(10);
-    doc.text("Seller:", 14, 36);
-    doc.text("Ahanitya Pharma Life Science LLP", 14, 41);
-    doc.text("Address: (Add your office address in code)", 14, 46);
-    doc.text("GSTIN: (Add GSTIN in code)", 14, 51);
-
-    // Buyer details
-    doc.text("Bill To:", 120, 36);
-    doc.text(s.bizName || "-", 120, 41);
-    doc.text(`Role: ${s.role}`, 120, 46);
-    doc.text(`Mobile: ${s.mobile}`, 120, 51);
-    if(s.gstin) doc.text(`GSTIN: ${s.gstin}`, 120, 56);
-    doc.text(`State: ${s.city}`, 120, 61);
-    doc.text(`Area: ${s.area || "-"}`, 120, 66);
-
-    // Table
-    const startY = 74;
-    if(doc.autoTable){
-      doc.autoTable({
-        startY,
-        head: [[
-          "Sr", "Brand", "Type", "Pack", "Qty", "Rate", "Taxable", "GST%", "GST Amt", "Total"
-        ]],
-        body: rows,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [17,121,154] },
-        margin: { left: 14, right: 14 }
-      });
-    } else {
-      // fallback: simple text
-      doc.setFontSize(9);
-      doc.text("Items:", 14, startY);
-      let y = startY + 6;
-      rows.forEach(r=>{
-        doc.text(`${r[0]}. ${r[1]} Qty:${r[4]} Total:${r[9]}`, 14, y);
-        y += 5;
-      });
-    }
-
-    const afterY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? (doc.lastAutoTable.finalY + 8) : 250;
-
-    // Totals box
-    doc.setFontSize(10);
-    doc.text(`Subtotal (Taxable): INR ${money(subTotal)}`, 14, afterY);
-    doc.text(`GST Total: INR ${money(gstTotal)}`, 14, afterY + 6);
-
-    if(isGujarat){
-      doc.text(`CGST: INR ${money(cgst)}   SGST: INR ${money(sgst)}`, 14, afterY + 12);
-    } else {
-      doc.text(`IGST: INR ${money(igst)}`, 14, afterY + 12);
-    }
-
-    doc.setFontSize(12);
-    doc.text(`Grand Total: INR ${money(grandTotal)}`, 14, afterY + 20);
-
-    doc.setFontSize(9);
-    doc.text("This is a system-generated invoice (client-side). For accounting, verify GSTIN/HSN details.", 14, afterY + 28);
-
-    doc.save(`${orderId}_GST_Invoice.pdf`);
-    setMsg($("orderMsg"),"GST Invoice PDF generated and downloaded.", "ok");
-  }
-
-
   // =============================
   // EVENTS
   // =============================
-  window.addEventListener("load", async ()=>{
+  window.addEventListener("load", ()=>{
     initStorage();
-
-    // Sync products from Google Sheet via SheetDB (best-effort)
-    try{ await syncProductsFromSheet(); }catch(e){ console.warn(e); }
-
 
     // Populate areas for selected state
     const stateSel = document.getElementById("city");
     if(stateSel){
       populateAreasForState(stateSel.value);
-      stateSel.addEventListener("change", ()=> { populateAreasForState(stateSel.value); });
+      stateSel.addEventListener("change", ()=> populateAreasForState(stateSel.value));
     }
 
-    // Preview catalog on login screen
-    const roleSel = document.getElementById("role");
-    if(roleSel){
-      roleSel.addEventListener("change", renderPreview);
-    }
-    renderPreview();
-
-    $("btnSignup").addEventListener("click", async (e)=>{ e.preventDefault(); try{ await signup(); }catch(err){ console.warn(err); setMsg($("authMsg"), "Signup failed. Check console for details.", "bad"); } });
-    $("btnLogin").addEventListener("click", async (e)=>{ e.preventDefault(); try{ await login(); }catch(err){ console.warn(err); setMsg($("authMsg"), "Login failed. Check console for details.", "bad"); } });
-    $("btnAdminLogin").addEventListener("click", (e)=>{ e.preventDefault(); try{ adminLogin(); }catch(err){ console.warn(err); setMsg($("authMsg"), "Admin login failed. Check console.", "bad"); } });
-$("btnLogout").addEventListener("click", logout);
-
-    // Forgot password UI
-    const fpPanel = $("forgotPanel");
-    const fpMsg = $("fpMsg");
-    const btnForgot = $("btnForgot");
-    const btnResetPass = $("btnResetPass");
-    const btnCancelReset = $("btnCancelReset");
-
-    if(btnForgot){
-      btnForgot.addEventListener("click", ()=>{
-        if(fpPanel) fpPanel.style.display = (fpPanel.style.display==="none" || !fpPanel.style.display) ? "block" : "none";
-        if(fpMsg) fpMsg.style.display = "none";
-      });
-    }
-    if(btnCancelReset){
-      btnCancelReset.addEventListener("click", ()=>{
-        if(fpPanel) fpPanel.style.display = "none";
-        if(fpMsg) fpMsg.style.display = "none";
-        if($("fpEmail")) $("fpEmail").value = "";
-        if($("fpMobile")) $("fpMobile").value = "";
-        if($("fpNewPass")) $("fpNewPass").value = "";
-        if($("fpNewPass2")) $("fpNewPass2").value = "";
-      });
-    }
-    if(btnResetPass){
-      btnResetPass.addEventListener("click", async ()=>{
-        if(fpMsg) fpMsg.style.display = "none";
-        const email = ($("fpEmail")?.value || "").trim().toLowerCase();
-        const mobile = ($("fpMobile")?.value || "").trim();
-        const p1 = ($("fpNewPass")?.value || "").trim();
-        const p2 = ($("fpNewPass2")?.value || "").trim();
-        if(!email) return setMsg(fpMsg, "Email is required.", "bad");
-        const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-        if(!emailOk) return setMsg(fpMsg, "Enter a valid email address.", "bad");
-        if(!mobile || mobile.length < 10) return setMsg(fpMsg, "Enter registered mobile number.", "bad");
-        if(!p1 || p1.length < 4) return setMsg(fpMsg, "New password must be at least 4 characters.", "bad");
-        if(p1 !== p2) return setMsg(fpMsg, "Passwords do not match.", "bad");
-
-        btnResetPass.disabled = true;
-        const old = btnResetPass.textContent;
-        btnResetPass.textContent = "Resetting...";
-        try{
-          const r = await resetPasswordWithSheet(email, mobile, p1);
-          if(!r.ok) setMsg(fpMsg, r.message, "bad");
-          else {
-            setMsg(fpMsg, r.message, "ok");
-            setTimeout(()=>{ if(fpPanel) fpPanel.style.display="none"; }, 900);
-          }
-        }catch(e){
-          console.warn(e);
-          setMsg(fpMsg, "Reset failed. Check SheetDB access and users sheet headers.", "bad");
-        }finally{
-          btnResetPass.disabled = false;
-          btnResetPass.textContent = old;
-        }
-      });
-    }
+    $("btnSignup").addEventListener("click", signup);
+    $("btnLogin").addEventListener("click", login);
+    $("btnAdminLogin").addEventListener("click", adminLogin);
+    $("btnLogout").addEventListener("click", logout);
 
     $("search").addEventListener("input", renderProducts);
     $("availability").addEventListener("change", renderProducts);
 
     $("btnWhatsApp").addEventListener("click", sendWhatsApp);
     $("btnEmail").addEventListener("click", sendEmail);
-    const pdfBtn = document.getElementById("btnPdf");
-    if(pdfBtn){ pdfBtn.addEventListener("click", generateInvoicePDF); }
     $("btnClearCart").addEventListener("click", ()=>{ clearCart(); setMsg($("orderMsg"),"Cart cleared.", "ok"); setTimeout(()=>hideMsg($("orderMsg")),900); });
 
     $("btnSaveProduct").addEventListener("click", saveProduct);
