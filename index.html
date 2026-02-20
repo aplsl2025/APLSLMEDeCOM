@@ -109,11 +109,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
-
-  <!-- Firebase (Compat SDK for single-file HTML) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
 </head>
 <body>
   <div class="wrap">
@@ -472,6 +467,8 @@
   // =============================
   // SETTINGS (edit these)
   // =============================
+  const SHEETDB_API = "https://sheetdb.io/api/v1/oq0xux451r2tn";
+
   const SETTINGS = {
     ADMIN_PIN: "2580",
     SERVICE_CITY_ONLY: "Gujarat",         // enforce city restriction
@@ -480,86 +477,6 @@
     DEFAULT_DISCOUNTS: { retailer:0, wholesaler:3, doctor:5, hospital:7, stockist:2, partner:0 },
     BASE_PRICE_TYPE: "PTR" // PTR/PTS/INST label (demo only)
   };
-  // =============================
-  // FIREBASE (Firestore) - Database Connection
-  // =============================
-  // 1) Paste your Firebase Web App config below (Project Settings -> Your apps -> Config)
-  // NOTE: Firebase apiKey is OK to be public; security is enforced by Firestore Rules.
-  const FIREBASE_CONFIG = {
-    apiKey: "PASTE_API_KEY",
-    authDomain: "PASTE_AUTH_DOMAIN",
-    projectId: "PASTE_PROJECT_ID",
-    storageBucket: "PASTE_STORAGE_BUCKET",
-    messagingSenderId: "PASTE_SENDER_ID",
-    appId: "PASTE_APP_ID"
-  };
-
-  // 2) Turn ON/OFF database mode
-  const USE_FIREBASE_DB = true; // set false to use only local storage
-
-  let db = null;
-  function initFirebase(){
-    if(!USE_FIREBASE_DB) return;
-    try{
-      // firebase-app-compat provides global "firebase"
-      if(!FIREBASE_CONFIG || !FIREBASE_CONFIG.projectId || FIREBASE_CONFIG.projectId.startsWith("PASTE_")){
-        console.warn("Firebase config not set. Using local storage.");
-        return;
-      }
-      if(!firebase.apps.length){
-        firebase.initializeApp(FIREBASE_CONFIG);
-      }
-      db = firebase.firestore();
-    }catch(e){
-      console.warn("Firebase init failed. Using local storage.", e);
-      db = null;
-    }
-  }
-
-  async function db_getProducts(){
-    if(!db) return null;
-    const snap = await db.collection("products").get();
-    const products = [];
-    snap.forEach(doc=> products.push({ id: doc.id, ...doc.data() }));
-    return products;
-  }
-
-  async function db_saveOrder(orderPayload){
-    if(!db) return false;
-    await db.collection("orders").add({
-      ...orderPayload,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    return true;
-  }
-
-  async function db_upsertUser(userPayload){
-    if(!db) return false;
-    // Store by mobile as document id to avoid duplicates
-    const mobile = String(userPayload.mobile || "").trim();
-    if(!mobile) return false;
-    await db.collection("users").doc(mobile).set({
-      ...userPayload,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge:true });
-    return true;
-  }
-
-  async function db_seedProductsIfEmpty(seedList){
-    if(!db) return false;
-    const snap = await db.collection("products").limit(1).get();
-    if(!snap.empty) return false;
-    const batch = db.batch();
-    seedList.forEach(p=>{
-      const id = p.id || ("P" + Math.floor(Math.random()*90000 + 10000));
-      const ref = db.collection("products").doc(id);
-      const { id:_, ...rest } = { ...p, id };
-      batch.set(ref, rest);
-    });
-    await batch.commit();
-    return true;
-  }
-
   // =============================
   // AREAS BY STATE (edit as needed)
   // =============================
@@ -678,9 +595,81 @@
   }
   function save(key, obj){ _setItem(key, JSON.stringify(obj)); }
 
+  // =============================
+  // SHEETDB (Google Sheets backend)
+  // =============================
+  async function sheetGet(sheetName){
+    const res = await fetch(`${SHEETDB_API}?sheet=${encodeURIComponent(sheetName)}`);
+    if(!res.ok) throw new Error(`SheetDB GET failed: ${sheetName}`);
+    return res.json();
+  }
+
+  async function sheetPost(sheetName, rows){
+    const res = await fetch(`${SHEETDB_API}?sheet=${encodeURIComponent(sheetName)}`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ data: rows })
+    });
+    if(!res.ok) throw new Error(`SheetDB POST failed: ${sheetName}`);
+    return res.json();
+  }
+
+  async function syncProductsFromSheet(){
+    const rows = await sheetGet("products");
+    const products = rows.map(r => ({
+      id: r.id,
+      brand: r.brand,
+      company: r.company,
+      strength: r.strength,
+      pack: r.pack,
+      type: r.type,
+      gst: Number(r.gst || 0),
+      basePrice: Number(r.basePrice || 0),
+      status: (r.status || "available").toLowerCase()
+    }));
+    if(products.length){ save(K_PRODUCTS, products); }
+    return products;
+  }
+
+  async function fetchUsersFromSheet(){
+    const rows = await sheetGet("users");
+    // normalize
+    return rows.map(r => ({
+      mobile: String(r.mobile || "").trim(),
+      pass: String(r.pass || "").trim(),
+      role: String(r.role || "").trim(),
+      bizName: String(r.bizName || "").trim(),
+      gstin: String(r.gstin || "").trim(),
+      dlno: String(r.dlno || "").trim(),
+      city: String(r.city || "").trim(),
+      area: String(r.area || "").trim(),
+      address: String(r.address || "").trim(),
+      approved: String(r.approved || "").toLowerCase() === "true" || String(r.approved || "") === "1"
+    }));
+  }
+
+  async function createUserInSheet(userObj){
+    // IMPORTANT: Sheet headers must match these keys
+    await sheetPost("users", [{
+      mobile: userObj.mobile,
+      pass: userObj.pass,
+      role: userObj.role,
+      bizName: userObj.bizName,
+      gstin: userObj.gstin || "",
+      dlno: userObj.dlno || "",
+      city: userObj.city,
+      area: userObj.area || "",
+      address: userObj.address || "",
+      approved: userObj.approved ? "TRUE" : "FALSE"
+    }]);
+  }
+
+  async function saveOrderToSheet(orderPayload){
+    await sheetPost("orders", [orderPayload]);
+  }
+
   function initStorage(){
-    initFirebase();
-const prods = load(K_PRODUCTS, null);
+    const prods = load(K_PRODUCTS, null);
     if(!prods || (Array.isArray(prods) && prods.length===0)){
       save(K_PRODUCTS, SEED_PRODUCTS);
     }
@@ -692,11 +681,6 @@ const prods = load(K_PRODUCTS, null);
     if(!users){ save(K_USERS, []); }
     const cart = load(K_CART, null);
     if(!cart){ save(K_CART, []); }
-  
-    // If Firebase is configured, seed initial products into Firestore (only if empty)
-    if(db){
-      db_seedProductsIfEmpty(SEED_PRODUCTS).catch(()=>{});
-    }
   }
 
   function setMsg(el, text, type){
@@ -716,7 +700,7 @@ const prods = load(K_PRODUCTS, null);
 
   function calcPrice(product, role){
     const discounts = currentDiscounts();
-    const d = Number(discounts[role] (discounts[s.role] !== undefined && discounts[s.role] !== null) ? discounts[s.role] : 0);
+    const d = (discounts && Object.prototype.hasOwnProperty.call(discounts, role)) ? Number(discounts[role] || 0) : 0;
     const base = Number(product.basePrice || 0);
     const net = base * (1 - d/100);
     return { base, discount:d, net };
@@ -767,7 +751,7 @@ const prods = load(K_PRODUCTS, null);
     return city === SETTINGS.SERVICE_CITY_ONLY;
   }
 
-  function signup(){
+  async function signup(){
     const role = $("role").value;
     const mobile = $("mobile").value.trim();
     const pass = $("password").value.trim();
@@ -793,29 +777,57 @@ const prods = load(K_PRODUCTS, null);
       return setMsg(msg,"Select delivery area (Ahmedabad).", "bad");
     }
 
-    const users = load(K_USERS, []);
-    if(users.find(u=>u.mobile===mobile)){
-      return setMsg(msg,"Account already exists. Please login.", "bad");
+    // Check existing (SheetDB first, fallback local)
+    let exists = false;
+    try{
+      const usersSheet = await fetchUsersFromSheet();
+      exists = usersSheet.some(u => u.mobile === mobile);
+    }catch(e){
+      const usersLocal = load(K_USERS, []);
+      exists = usersLocal.some(u => u.mobile === mobile);
     }
-    users.push({ mobile, pass, role, bizName, gstin, dlno, city, area, address, approved:true, createdAt:Date.now() });
-    save(K_USERS, users);
-    // Also store/merge user in Firestore (optional)
-    db_upsertUser({ mobile, role, bizName, gstin, dlno, city, area, address, approved:true }).catch(()=>{});
+    if(exists) return setMsg(msg,"Account already exists. Please login.", "bad");
+
+    const newUser = { mobile, pass, role, bizName, gstin, dlno, city, area, address, approved:true };
+
+    // Save to SheetDB (primary)
+    try{
+      await createUserInSheet(newUser);
+    }catch(e){
+      // fallback: local only
+      const users = load(K_USERS, []);
+      users.push({ ...newUser, createdAt: Date.now() });
+      save(K_USERS, users);
+    }
+
     setMsg(msg,"Account created! Now click Login.", "ok");
   }
 
-  function login(){
+  async async function login(){
     const role = $("role").value;
     const mobile = $("mobile").value.trim();
     const pass = $("password").value.trim();
     const msg = $("authMsg");
     hideMsg(msg);
 
-    const users = load(K_USERS, []);
-    const u = users.find(x=>x.mobile===mobile && x.pass===pass);
+    let u = null;
+
+    // Try SheetDB users first
+    try{
+      const usersSheet = await fetchUsersFromSheet();
+      u = usersSheet.find(x => x.mobile === mobile && x.pass === pass);
+    }catch(e){
+      // ignore, fallback to local
+    }
+
+    if(!u){
+      const users = load(K_USERS, []);
+      u = users.find(x=>x.mobile===mobile && x.pass===pass) || null;
+    }
+
     if(!u) return setMsg(msg,"Invalid login. Check mobile/password or create account.", "bad");
-    if(u.role !== role) return setMsg(msg,"Role mismatch. Select the correct Business Type (Role).", "bad");
-    if(!u.approved) return setMsg(msg,"Your account is pending approval.", "bad");
+    if(String(u.role||"").trim() !== role) return setMsg(msg,"Role mismatch. Select the correct Business Type (Role).", "bad");
+    if(u.approved === false) return setMsg(msg,"Your account is pending approval.", "bad");
     if(!validateState(u.city)) return setMsg(msg,`Service currently active only in Gujarat.`, "bad");
 
     setSession({ ...u, isAdmin:false });
@@ -841,22 +853,6 @@ const prods = load(K_PRODUCTS, null);
   // =============================
   // PRODUCTS (STORE VIEW)
   // =============================
-  
-  let PRODUCTS_CACHE = null;
-  async function getProductsSmart(){
-    // Prefer Firestore if available
-    if(db){
-      try{
-        const p = await db_getProducts();
-        if(Array.isArray(p) && p.length){ PRODUCTS_CACHE = p; return p; }
-      }catch(e){ console.warn("Firestore product fetch failed", e); }
-    }
-    // Fallback to local storage
-    const local = load(K_PRODUCTS, []);
-    PRODUCTS_CACHE = local;
-    return local;
-  }
-
   function productMatches(p, q){
     if(!q) return true;
     const s = (p.brand+" "+p.company+" "+p.strength).toLowerCase();
@@ -867,6 +863,7 @@ const prods = load(K_PRODUCTS, null);
   function renderPreview(){
     const roleSel = document.getElementById("role");
     const role = roleSel ? roleSel.value : "retailer";
+    const products = load(K_PRODUCTS, []);
     const tbody = document.getElementById("previewRows");
     if(!tbody) return;
     tbody.innerHTML = "";
@@ -887,15 +884,14 @@ const prods = load(K_PRODUCTS, null);
     });
   }
 
-async function renderProducts(){
+function renderProducts(){
     const s = getSession();
     if(!s) return;
 
-    const products = await getProductsSmart();
-const q = $("search").value.trim();
+    const q = $("search").value.trim();
     const av = $("availability").value;
 
-    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
+    const products = load(K_PRODUCTS, []);
     const rows = products
       .filter(p => productMatches(p,q))
       .filter(p => av==="all" ? true : (av==="available" ? p.status==="available" : p.status==="soon"));
@@ -948,24 +944,6 @@ const q = $("search").value.trim();
         if(qty > 0){ addToCart(id, qty); } else { setMsg($("orderMsg"), "Select quantity greater than 0.", "bad"); }
       });
     });
-
-    // wire qty buttons
-    [...tbody.querySelectorAll("button[data-plus]")].forEach(btn=>{
-      btn.addEventListener("click", ()=>{
-        const id = btn.getAttribute("data-plus");
-        const el = document.getElementById("qty_"+id);
-        let val = Number(el.innerText || 0);
-        el.innerText = val + 1;
-      });
-    });
-
-    [...tbody.querySelectorAll("button[data-minus]")].forEach(btn=>{
-      btn.addEventListener("click", ()=>{
-        const id = btn.getAttribute("data-minus");
-        const el = document.getElementById("qty_"+id);
-        let val = Number(el.innerText || 0);
-        if(val > 0){ el.innerText = val - 1; }
-      });
     });
   }
 
@@ -1007,10 +985,10 @@ const q = $("search").value.trim();
   function buildOrderText(){
     const s = getSession();
     const cart = load(K_CART, []);
-    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
+    const products = load(K_PRODUCTS, []);
     const baseType = currentBaseType();
     const discounts = currentDiscounts();
-    const po = $("poNote").value.trim();
+    const po = $("poNote") ? $("poNote").value.trim() : "";
     const orderId = nowId();
 
     let lines = [];
@@ -1018,17 +996,21 @@ const q = $("search").value.trim();
     lines.push(`Order ID: ${orderId}`);
     lines.push(`Date: ${new Date().toLocaleString()}`);
     lines.push(``);
-    lines.push(`Buyer: ${s.bizName}`);
-    lines.push(`Role: ${s.role}`);
-    lines.push(`Mobile: ${s.mobile}`);
-    if(s.gstin) lines.push(`GSTIN: ${s.gstin}`);
-    if(s.dlno) lines.push(`DL No: ${s.dlno}`);
-    lines.push(`Delivery: ${s.city}${s.area? ", "+s.area:""}`);
-    lines.push(`Address: ${s.address}`);
+    lines.push(`Buyer: ${s?.bizName || "-"}`);
+    lines.push(`Role: ${s?.role || "-"}`);
+    lines.push(`Mobile: ${s?.mobile || "-"}`);
+    if(s?.gstin) lines.push(`GSTIN: ${s.gstin}`);
+    if(s?.dlno) lines.push(`DL No: ${s.dlno}`);
+    lines.push(`Delivery: ${s?.city || "-"}${s?.area? ", "+s.area:""}`);
+    lines.push(`Address: ${s?.address || "-"}`);
     lines.push(``);
-    lines.push(`Pricing: Base ${baseType} | Discount: ${Number(discounts[s.role] (discounts[s.role] !== undefined && discounts[s.role] !== null) ? discounts[s.role] : 0)}%`);
+    const disc = (discounts && s && Object.prototype.hasOwnProperty.call(discounts, s.role)) ? Number(discounts[s.role] || 0) : 0;
+    lines.push(`Pricing: Base ${baseType} | Discount: ${disc}%`);
     lines.push(``);
     lines.push(`Items:`);
+
+    let subTotal = 0;
+    let gstTotal = 0;
 
     cart.forEach((ci, idx)=>{
       const p = products.find(x=>x.id===ci.productId);
@@ -1037,25 +1019,16 @@ const q = $("search").value.trim();
       const taxable = pr.net * ci.qty;
       const gstAmt = taxable * ((p.gst||0)/100);
       const lineTotal = taxable + gstAmt;
+      subTotal += taxable;
+      gstTotal += gstAmt;
+
       lines.push(`${idx+1}. ${p.brand} (${p.type}) - ${p.strength} | Pack ${p.pack} | Qty ${ci.qty} | Rate INR ${money(pr.net)} | Taxable INR ${money(taxable)} | GST ${p.gst||0}% (INR ${money(gstAmt)}) | Total INR ${money(lineTotal)}`);
     });
 
     lines.push(``);
-    // Totals
-    let subTotal = 0;
-    let gstTotal = 0;
-    cart.forEach((ci)=>{
-      const p = products.find(x=>x.id===ci.productId);
-      if(!p) return;
-      const pr = calcPrice(p, s.role);
-      const taxable = pr.net * ci.qty;
-      const gstAmt = taxable * ((p.gst||0)/100);
-      subTotal += taxable;
-      gstTotal += gstAmt;
-    });
     const grandTotal = subTotal + gstTotal;
 
-    const isGujarat = (s.city === "Gujarat");
+    const isGujarat = (s && s.city === "Gujarat");
     const cgst = isGujarat ? gstTotal/2 : 0;
     const sgst = isGujarat ? gstTotal/2 : 0;
     const igst = isGujarat ? 0 : gstTotal;
@@ -1074,7 +1047,8 @@ const q = $("search").value.trim();
     }
     lines.push(``);
     lines.push(`- Sent from APLSL B2B Portal`);
-    return { text: lines.join("\n"), total, orderId };
+
+    return { text: lines.join("\n"), totals: { subTotal, gstTotal, grandTotal }, orderId };
   }
 
   function renderCart(){
@@ -1082,7 +1056,7 @@ const q = $("search").value.trim();
     if(!s || s.isAdmin) return;
 
     const cart = load(K_CART, []);
-    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
+    const products = load(K_PRODUCTS, []);
     const wrap = $("cartList");
 
     if(cart.length===0){
@@ -1203,15 +1177,33 @@ const q = $("search").value.trim();
   // =============================
   // ORDER SENDERS
   // =============================
-  async function sendWhatsApp(){
+  function sendWhatsApp(){
     const s = getSession();
     if(!s) return;
 
     const wa = $("waNumber").value.trim() || SETTINGS.DEFAULT_WA;
+    const { text } = buildOrderText();
     const built = buildOrderText();
-    const text = built.text;
-    // Save order to Firestore (optional)
-    db_saveOrder({ orderId: built.orderId, channel:'whatsapp', buyer: s.bizName, mobile: s.mobile, role: s.role, state: s.city, area: s.area||'', address: s.address||'', orderText: text }).catch(()=>{});
+    const orderId = built.orderId;
+    // Save order to Google Sheet (best-effort)
+    try{
+      const payload = {
+        orderId,
+        date: new Date().toISOString(),
+        buyerMobile: s.mobile,
+        buyerName: s.bizName,
+        role: s.role,
+        city: s.city,
+        area: s.area || "",
+        address: s.address || "",
+        items: built.text,
+        subTotal: document.getElementById("subTotal")?.textContent || "0",
+        gstTotal: document.getElementById("gstTotal")?.textContent || "0",
+        grandTotal: document.getElementById("grandTotal")?.textContent || "0",
+        poNote: ($("poNote")?.value || "").trim()
+      };
+      await saveOrderToSheet(payload);
+    }catch(e){ console.warn(e); }
 
     // normalize wa number to digits (keep country code)
     const digits = wa.replace(/[^\d]/g,"");
@@ -1221,17 +1213,35 @@ const q = $("search").value.trim();
     setMsg($("orderMsg"),"Opened WhatsApp with order message.", "ok");
   }
 
-  async function sendEmail(){
+  function sendEmail(){
     const s = getSession();
     if(!s) return;
 
     const toEmail = $("toEmail").value.trim() || SETTINGS.DEFAULT_EMAIL;
-    const built = buildOrderText();
-    const text = built.text;
-    // Save order to Firestore (optional)
-    db_saveOrder({ orderId: built.orderId, channel:'whatsapp', buyer: s.bizName, mobile: s.mobile, role: s.role, state: s.city, area: s.area||'', address: s.address||'', orderText: text }).catch(()=>{});
+    const { text } = buildOrderText();
 
-    $("orderTextField").value = text;
+    $("orderTextField").value = text;    const built = buildOrderText();
+    // Save order to Google Sheet (best-effort)
+    try{
+      const payload = {
+        orderId: built.orderId,
+        date: new Date().toISOString(),
+        buyerMobile: s.mobile,
+        buyerName: s.bizName,
+        role: s.role,
+        city: s.city,
+        area: s.area || "",
+        address: s.address || "",
+        items: built.text,
+        subTotal: document.getElementById("subTotal")?.textContent || "0",
+        gstTotal: document.getElementById("gstTotal")?.textContent || "0",
+        grandTotal: document.getElementById("grandTotal")?.textContent || "0",
+        poNote: ($("poNote")?.value || "").trim()
+      };
+      await saveOrderToSheet(payload);
+    }catch(e){ console.warn(e); }
+
+    $("orderTextField").value = built.text;
 
     const form = $("emailForm");
     form.action = `https://formsubmit.co/${encodeURIComponent(toEmail)}`;
@@ -1243,8 +1253,8 @@ const q = $("search").value.trim();
   // =============================
   // ADMIN
   // =============================
-  async function renderAdmin(){
-    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
+  function renderAdmin(){
+    const products = load(K_PRODUCTS, []);
     $("basePriceType").value = currentBaseType();
 
     const discounts = currentDiscounts();
@@ -1268,7 +1278,7 @@ const q = $("search").value.trim();
   }
 
   function loadProductToEditor(id){
-    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
+    const products = load(K_PRODUCTS, []);
     const p = products.find(x=>x.id===id);
     if(!p) return;
     $("pId").value = p.id;
@@ -1309,7 +1319,7 @@ const q = $("search").value.trim();
     if(!brand || !company || !strength) return alert("Brand, Company, Strength are required.");
     if(!id) id = "P" + Math.floor(Math.random()*90000 + 10000);
 
-    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
+    const products = load(K_PRODUCTS, []);
     const existing = products.find(p=>p.id===id);
     const obj = { id, brand, company, strength, pack, type, gst, basePrice, status };
 
@@ -1319,13 +1329,6 @@ const q = $("search").value.trim();
       products.push(obj);
     }
     save(K_PRODUCTS, products);
-    PRODUCTS_CACHE = products;
-    // Also save to Firestore if configured
-    if(db){
-      db.collection("products").doc(String(id)).set({
-        brand, company, strength, pack, type, gst, basePrice, status
-      }, { merge:true }).then(()=>{}).catch(()=>{});
-    }
     renderAdmin();
     alert("Saved.");
   }
@@ -1339,8 +1342,6 @@ const q = $("search").value.trim();
     let products = load(K_PRODUCTS, []);
     products = products.filter(p=>p.id!==id);
     save(K_PRODUCTS, products);
-    PRODUCTS_CACHE = products;
-    if(db){ db.collection("products").doc(String(id)).delete().then(()=>{}).catch(()=>{}); }
     $("pId").value=""; $("pBrand").value=""; $("pCompany").value=""; $("pStrength").value="";
     $("pPack").value=""; $("pGst").value=""; $("pPrice").value="";
     renderAdmin();
@@ -1360,7 +1361,7 @@ const q = $("search").value.trim();
     if(!s) return;
 
     const cart = load(K_CART, []);
-    const products = PRODUCTS_CACHE || load(K_PRODUCTS, []);
+    const products = load(K_PRODUCTS, []);
 
     if(cart.length === 0){
       setMsg($("orderMsg"),"Cart is empty. Add items first.", "bad");
@@ -1483,8 +1484,12 @@ const q = $("search").value.trim();
   // =============================
   // EVENTS
   // =============================
-  window.addEventListener("load", ()=>{
+  window.addEventListener("load", async ()=>{
     initStorage();
+
+    // Sync products from Google Sheet via SheetDB (best-effort)
+    try{ await syncProductsFromSheet(); }catch(e){ console.warn(e); }
+
 
     // Populate areas for selected state
     const stateSel = document.getElementById("city");
