@@ -723,6 +723,19 @@
     return { ok:true, message:"Password updated successfully. Please login." };
   }
 
+  function adminLogin(){
+    const pin = prompt('Enter Admin PIN');
+    if(pin === null) return;
+    if(String(pin).trim() !== String(SETTINGS.ADMIN_PIN)){
+      setMsg($("authMsg"), 'Invalid Admin PIN.', 'bad');
+      return;
+    }
+    // admin session
+    setSession({ isAdmin:true, bizName:'ADMIN', role:'admin', mobile:'', email:'' });
+    setMsg($("authMsg"), 'Admin login successful.', 'ok');
+    setTimeout(()=>{ hideMsg($("authMsg")); showView(); }, 200);
+  }
+
   async function signup(){
     const role = $("role").value;
     const mobile = $("mobile").value.trim();
