@@ -148,6 +148,10 @@
               <input id="mobile" type="tel" placeholder="e.g., 98487090212" />
             </div>
             <div>
+              <label>Email ID</label>
+              <input id="email" type="email" placeholder="e.g., abc@gmail.com" />
+            </div>
+            <div>
               <label>Password</label>
               <input id="password" type="password" placeholder="Create or enter password" />
             </div>
@@ -196,6 +200,29 @@
             <button class="btn2" id="btnLogin">Login</button>
             <button class="ghost" id="btnAdminLogin">Admin Login</button>
           </div>
+          <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+            <button type="button" class="link" id="btnForgot" style="background:none;border:none;color:#11799A;cursor:pointer;text-decoration:underline;font-weight:600;">
+              Forgot Password?
+            </button>
+          </div>
+
+          <div class="card" id="forgotPanel" style="display:none; margin-top:12px; padding:14px; border-radius:14px;">
+            <div class="row" style="display:grid; gap:10px;">
+              <input type="email" id="fpEmail" placeholder="Registered Email ID">
+              <input type="tel" id="fpMobile" placeholder="Registered Mobile Number">
+              <input type="password" id="fpNewPass" placeholder="New Password (min 4 chars)">
+              <input type="password" id="fpNewPass2" placeholder="Confirm New Password">
+              <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+                <button type="button" class="btn" id="btnResetPass">Reset Password</button>
+                <button type="button" class="btn ghost" id="btnCancelReset">Cancel</button>
+              </div>
+              <div class="msg" id="fpMsg" style="display:none;"></div>
+              <div class="mini" style="opacity:.85">
+                Note: Password reset works only if your <b>Email + Mobile</b> match an existing account in the <b>users</b> sheet.
+              </div>
+            </div>
+          </div>
+
 
           <div class="msg hide" id="authMsg"></div>
           <div class="msg" style="margin-top:12px">
@@ -643,6 +670,7 @@
     // normalize
     return rows.map(r => ({
       mobile: String(r.mobile || "").trim(),
+      email: String(r.email || "").trim(),
       pass: String(r.pass || "").trim(),
       role: String(r.role || "").trim(),
       bizName: String(r.bizName || "").trim(),
@@ -659,6 +687,7 @@
     // IMPORTANT: Sheet headers must match these keys
     await sheetPost("users", [{
       mobile: userObj.mobile,
+      email: userObj.email || "",
       pass: userObj.pass,
       role: userObj.role,
       bizName: userObj.bizName,
@@ -673,6 +702,110 @@
 
   async function saveOrderToSheet(orderPayload){
     await sheetPost("orders", [orderPayload]);
+  }
+
+  async function sheetPatchByColumn(sheetName, columnName, value, dataObj){
+    const url = `${SHEETDB_API}/${encodeURIComponent(columnName)}/${encodeURIComponent(value)}?sheet=${encodeURIComponent(sheetName)}`;
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ data: dataObj })
+    });
+    if(!res.ok) throw new Error(`SheetDB PATCH failed: ${sheetName}.${columnName}=${value}`);
+    return res.json();
+  }
+
+  async function resetPasswordWithSheet(email, mobile, newPass){
+    const users = await fetchUsersFromSheet();
+    const u = users.find(x => x.mobile === mobile && (x.email || "").toLowerCase() === email.toLowerCase());
+    if(!u) return { ok:false, message:"No account found with this Email + Mobile." };
+    await sheetPatchByColumn("users", "mobile", mobile, { pass: newPass });
+    return { ok:true, message:"Password updated successfully. Please login." };
+  }
+
+  async function signup(){
+    const role = $("role").value;
+    const mobile = $("mobile").value.trim();
+    const email = ($("email")?.value || "").trim().toLowerCase();
+    const pass = $("password").value.trim();
+    const bizName = $("bizName").value.trim();
+    const gstin = $("gstin").value.trim();
+    const dlno = $("dlno").value.trim();
+    const city = $("city").value;
+    const area = $("area").value;
+    const address = $("address").value.trim();
+
+    const msg = $("authMsg");
+    hideMsg(msg);
+
+    if(!mobile || mobile.length < 10) return setMsg(msg,"Enter a valid mobile number.", "bad");
+    if(!email) return setMsg(msg,"Email is required.", "bad");
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if(!emailOk) return setMsg(msg,"Enter a valid email address.", "bad");
+    if(!pass || pass.length < 4) return setMsg(msg,"Password must be at least 4 characters.", "bad");
+    if(!bizName) return setMsg(msg,"Enter business/shop name.", "bad");
+    if(!address) return setMsg(msg,"Enter delivery address.", "bad");
+
+    if(!validateState(city)){
+      return setMsg(msg,`Service currently active only in Gujarat. Please select Gujarat to proceed.`, "bad");
+    }
+    if(!area){
+      return setMsg(msg,"Select delivery area (Ahmedabad).", "bad");
+    }
+
+    // Unique email + mobile check (SheetDB first, fallback local)
+    let exists = false;
+    try{
+      const usersSheet = await fetchUsersFromSheet();
+      exists = usersSheet.some(u => (u.mobile === mobile) || ((u.email||"").toLowerCase() === email));
+    }catch(e){
+      const usersLocal = load(K_USERS, []);
+      exists = usersLocal.some(u => (u.mobile === mobile) || (String(u.email||"").toLowerCase() === email));
+    }
+    if(exists) return setMsg(msg,"Account already exists with this mobile or email. Please login.", "bad");
+
+    const newUser = { mobile, email, pass, role, bizName, gstin, dlno, city, area, address, approved:true };
+    try{
+      await createUserInSheet(newUser);
+    }catch(e){
+      // fallback local only
+      const users = load(K_USERS, []);
+      users.push({ ...newUser, createdAt: Date.now() });
+      save(K_USERS, users);
+    }
+
+    setMsg(msg,"Account created! Now click Login.", "ok");
+  }
+
+  async function login(){
+    const role = $("role").value;
+    const email = ($("email")?.value || "").trim().toLowerCase();
+    const pass = $("password").value.trim();
+    const msg = $("authMsg");
+    hideMsg(msg);
+
+    if(!email) return setMsg(msg,"Email is required.", "bad");
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if(!emailOk) return setMsg(msg,"Enter a valid email address.", "bad");
+    if(!pass) return setMsg(msg,"Password is required.", "bad");
+
+    let u = null;
+    try{
+      const usersSheet = await fetchUsersFromSheet();
+      u = usersSheet.find(x => ((x.email||"").toLowerCase() === email) && x.pass === pass);
+    }catch(e){}
+    if(!u){
+      const users = load(K_USERS, []);
+      u = users.find(x => (String(x.email||"").toLowerCase() === email) && x.pass === pass) || null;
+    }
+    if(!u) return setMsg(msg,"Invalid email or password.", "bad");
+    if(String(u.role||"").trim() !== role) return setMsg(msg,"Role mismatch. Select correct Business Type.", "bad");
+    if(u.approved === false) return setMsg(msg,"Your account is pending approval.", "bad");
+    if(!validateState(u.city)) return setMsg(msg,`Service currently active only in Gujarat.`, "bad");
+
+    setSession({ ...u, isAdmin:false });
+    setMsg(msg,"Login successful. Loading store...", "ok");
+    setTimeout(()=>{ hideMsg(msg); showView(); }, 250);
   }
 
   function initStorage(){
@@ -1161,6 +1294,63 @@
     $("btnLogin").addEventListener("click", login);
     $("btnAdminLogin").addEventListener("click", adminLogin);
     $("btnLogout").addEventListener("click", logout);
+
+    // Forgot password UI
+    const fpPanel = $("forgotPanel");
+    const fpMsg = $("fpMsg");
+    const btnForgot = $("btnForgot");
+    const btnResetPass = $("btnResetPass");
+    const btnCancelReset = $("btnCancelReset");
+
+    if(btnForgot){
+      btnForgot.addEventListener("click", ()=>{
+        if(fpPanel) fpPanel.style.display = (fpPanel.style.display==="none" || !fpPanel.style.display) ? "block" : "none";
+        if(fpMsg) fpMsg.style.display = "none";
+      });
+    }
+    if(btnCancelReset){
+      btnCancelReset.addEventListener("click", ()=>{
+        if(fpPanel) fpPanel.style.display = "none";
+        if(fpMsg) fpMsg.style.display = "none";
+        if($("fpEmail")) $("fpEmail").value = "";
+        if($("fpMobile")) $("fpMobile").value = "";
+        if($("fpNewPass")) $("fpNewPass").value = "";
+        if($("fpNewPass2")) $("fpNewPass2").value = "";
+      });
+    }
+    if(btnResetPass){
+      btnResetPass.addEventListener("click", async ()=>{
+        if(fpMsg) fpMsg.style.display = "none";
+        const email = ($("fpEmail")?.value || "").trim().toLowerCase();
+        const mobile = ($("fpMobile")?.value || "").trim();
+        const p1 = ($("fpNewPass")?.value || "").trim();
+        const p2 = ($("fpNewPass2")?.value || "").trim();
+        if(!email) return setMsg(fpMsg, "Email is required.", "bad");
+        const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        if(!emailOk) return setMsg(fpMsg, "Enter a valid email address.", "bad");
+        if(!mobile || mobile.length < 10) return setMsg(fpMsg, "Enter registered mobile number.", "bad");
+        if(!p1 || p1.length < 4) return setMsg(fpMsg, "New password must be at least 4 characters.", "bad");
+        if(p1 !== p2) return setMsg(fpMsg, "Passwords do not match.", "bad");
+
+        btnResetPass.disabled = true;
+        const old = btnResetPass.textContent;
+        btnResetPass.textContent = "Resetting...";
+        try{
+          const r = await resetPasswordWithSheet(email, mobile, p1);
+          if(!r.ok) setMsg(fpMsg, r.message, "bad");
+          else {
+            setMsg(fpMsg, r.message, "ok");
+            setTimeout(()=>{ if(fpPanel) fpPanel.style.display="none"; }, 900);
+          }
+        }catch(e){
+          console.warn(e);
+          setMsg(fpMsg, "Reset failed. Check SheetDB access and users sheet headers.", "bad");
+        }finally{
+          btnResetPass.disabled = false;
+          btnResetPass.textContent = old;
+        }
+      });
+    }
 
     $("search").addEventListener("input", renderProducts);
     $("availability").addEventListener("change", renderProducts);
