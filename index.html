@@ -196,9 +196,9 @@
           </div>
 
           <div class="btnrow">
-            <button class="btn" id="btnSignup">Create Account</button>
-            <button class="btn2" id="btnLogin">Login</button>
-            <button class="ghost" id="btnAdminLogin">Admin Login</button>
+            <button class="btn" id="btnSignup" type="button">Create Account</button>
+            <button class="btn2" id="btnLogin" type="button">Login</button>
+            <button class="ghost" id="btnAdminLogin" type="button">Admin Login</button>
           </div>
           <div style="margin-top:10px; display:flex; justify-content:flex-end;">
             <button type="button" class="link" id="btnForgot" style="background:none;border:none;color:#11799A;cursor:pointer;text-decoration:underline;font-weight:600;">
@@ -1303,10 +1303,10 @@
     }
     renderPreview();
 
-    $("btnSignup").addEventListener("click", signup);
-    $("btnLogin").addEventListener("click", login);
-    $("btnAdminLogin").addEventListener("click", adminLogin);
-    $("btnLogout").addEventListener("click", logout);
+    $("btnSignup").addEventListener("click", async (e)=>{ e.preventDefault(); try{ await signup(); }catch(err){ console.warn(err); setMsg($("authMsg"), "Signup failed. Check console for details.", "bad"); } });
+    $("btnLogin").addEventListener("click", async (e)=>{ e.preventDefault(); try{ await login(); }catch(err){ console.warn(err); setMsg($("authMsg"), "Login failed. Check console for details.", "bad"); } });
+    $("btnAdminLogin").addEventListener("click", (e)=>{ e.preventDefault(); try{ adminLogin(); }catch(err){ console.warn(err); setMsg($("authMsg"), "Admin login failed. Check console.", "bad"); } });
+$("btnLogout").addEventListener("click", logout);
 
     // Forgot password UI
     const fpPanel = $("forgotPanel");
