@@ -1177,7 +1177,7 @@ function renderProducts(){
   // =============================
   // ORDER SENDERS
   // =============================
-  function sendWhatsApp(){
+  async function sendWhatsApp(){
     const s = getSession();
     if(!s) return;
 
@@ -1213,7 +1213,7 @@ function renderProducts(){
     setMsg($("orderMsg"),"Opened WhatsApp with order message.", "ok");
   }
 
-  function sendEmail(){
+  async function sendEmail(){
     const s = getSession();
     if(!s) return;
 
