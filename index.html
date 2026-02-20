@@ -803,7 +803,7 @@
     setMsg(msg,"Account created! Now click Login.", "ok");
   }
 
-  async async function login(){
+  async function login(){
     const role = $("role").value;
     const mobile = $("mobile").value.trim();
     const pass = $("password").value.trim();
@@ -897,6 +897,7 @@ function renderProducts(){
       .filter(p => av==="all" ? true : (av==="available" ? p.status==="available" : p.status==="soon"));
 
     const tbody = $("productRows");
+    if(!tbody) return;
     tbody.innerHTML = "";
 
     rows.forEach(p=>{
@@ -919,13 +920,11 @@ function renderProducts(){
           <div class="mini">Base INR ${money(pr.base)} • Disc ${pr.discount}%</div>
         </td>
         <td>
-          
-    <div class="qty-box">
-      <button class="qty-btn" data-minus="${p.id}">−</button>
-      <div class="qty-value" id="qty_${p.id}">0</div>
-      <button class="qty-btn" data-plus="${p.id}">+</button>
-    </div>
-    
+          <div class="qty-box">
+            <button class="qty-btn" data-minus="${p.id}" ${disabled}>−</button>
+            <div class="qty-value" id="qty_${p.id}">0</div>
+            <button class="qty-btn" data-plus="${p.id}" ${disabled}>+</button>
+          </div>
         </td>
         <td>
           <button class="btn" ${disabled} data-add="${p.id}">Add</button>
@@ -934,16 +933,37 @@ function renderProducts(){
       tbody.appendChild(tr);
     });
 
-    
-    // wire add buttons
+    // wire qty +/-
+    [...tbody.querySelectorAll("button[data-plus]")].forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-plus");
+        const el = document.getElementById("qty_"+id);
+        const val = Number(el?.innerText || 0);
+        if(el) el.innerText = String(val + 1);
+      });
+    });
+    [...tbody.querySelectorAll("button[data-minus]")].forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-minus");
+        const el = document.getElementById("qty_"+id);
+        const val = Number(el?.innerText || 0);
+        if(el) el.innerText = String(Math.max(0, val - 1));
+      });
+    });
 
+    // wire add buttons
     [...tbody.querySelectorAll("button[data-add]")].forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const id = btn.getAttribute("data-add");
-        const qty = Number(document.getElementById("qty_"+id).innerText || 0);
-        if(qty > 0){ addToCart(id, qty); } else { setMsg($("orderMsg"), "Select quantity greater than 0.", "bad"); }
+        const qty = Number(document.getElementById("qty_"+id)?.innerText || 0);
+        if(qty > 0){
+          addToCart(id, qty);
+          const el = document.getElementById("qty_"+id);
+          if(el) el.innerText = "0";
+        } else {
+          setMsg($("orderMsg"), "Select quantity greater than 0.", "bad");
+        }
       });
-    });
     });
   }
 
@@ -1153,25 +1173,6 @@ function renderProducts(){
         updateCartQty(inp.getAttribute("data-qty"), Number(inp.value||1));
       });
     });
-
-    // wire qty buttons
-    [...tbody.querySelectorAll("button[data-plus]")].forEach(btn=>{
-      btn.addEventListener("click", ()=>{
-        const id = btn.getAttribute("data-plus");
-        const el = document.getElementById("qty_"+id);
-        let val = Number(el.innerText || 0);
-        el.innerText = val + 1;
-      });
-    });
-
-    [...tbody.querySelectorAll("button[data-minus]")].forEach(btn=>{
-      btn.addEventListener("click", ()=>{
-        const id = btn.getAttribute("data-minus");
-        const el = document.getElementById("qty_"+id);
-        let val = Number(el.innerText || 0);
-        if(val > 0){ el.innerText = val - 1; }
-      });
-    });
   }
 
   // =============================
@@ -1182,13 +1183,12 @@ function renderProducts(){
     if(!s) return;
 
     const wa = $("waNumber").value.trim() || SETTINGS.DEFAULT_WA;
-    const { text } = buildOrderText();
     const built = buildOrderText();
-    const orderId = built.orderId;
+
     // Save order to Google Sheet (best-effort)
     try{
       const payload = {
-        orderId,
+        orderId: built.orderId,
         date: new Date().toISOString(),
         buyerMobile: s.mobile,
         buyerName: s.bizName,
@@ -1205,22 +1205,22 @@ function renderProducts(){
       await saveOrderToSheet(payload);
     }catch(e){ console.warn(e); }
 
-    // normalize wa number to digits (keep country code)
     const digits = wa.replace(/[^\d]/g,"");
-    const url = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+    const url = `https://wa.me/${digits}?text=${encodeURIComponent(built.text)}`;
     window.open(url, "_blank");
 
     setMsg($("orderMsg"),"Opened WhatsApp with order message.", "ok");
   }
+
+
 
   async function sendEmail(){
     const s = getSession();
     if(!s) return;
 
     const toEmail = $("toEmail").value.trim() || SETTINGS.DEFAULT_EMAIL;
-    const { text } = buildOrderText();
+    const built = buildOrderText();
 
-    $("orderTextField").value = text;    const built = buildOrderText();
     // Save order to Google Sheet (best-effort)
     try{
       const payload = {
@@ -1250,9 +1250,7 @@ function renderProducts(){
     setMsg($("orderMsg"),"Email tab opened (FormSubmit). If you are using it first time, it may ask to activate.", "ok");
   }
 
-  // =============================
-  // ADMIN
-  // =============================
+
   function renderAdmin(){
     const products = load(K_PRODUCTS, []);
     $("basePriceType").value = currentBaseType();
