@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>APLSL B2B Order Portal (SheetDB Login + Orders + GST + PDF)</title>
+  <title>APLSL B2B Order Portal (Admin + HSN + GST Slabs + SheetDB)</title>
 
   <!-- jsPDF + AutoTable (PDF bill) -->
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -22,7 +22,7 @@
                   var(--bg);
       color:var(--text);
     }
-    .wrap{max-width:1200px;margin:0 auto;padding:18px}
+    .wrap{max-width:1280px;margin:0 auto;padding:18px}
     .topbar{
       display:flex;gap:12px;align-items:center;justify-content:space-between;
       padding:14px 16px;border:1px solid var(--line);background:rgba(15,27,51,.75);
@@ -42,12 +42,13 @@
     button.secondary{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text);font-weight:600}
     button.danger{background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.35);color:#ffd1d1;font-weight:700}
     button:disabled{opacity:.6;cursor:not-allowed}
-    .grid{margin-top:14px;display:grid;grid-template-columns:380px 1fr;gap:14px}
+    .grid{margin-top:14px;display:grid;grid-template-columns:400px 1fr;gap:14px}
     @media (max-width: 980px){.grid{grid-template-columns:1fr}}
     .card{border:1px solid var(--line);background:rgba(15,27,51,.68);border-radius:16px;padding:14px;backdrop-filter: blur(8px)}
     .card h2{margin:0 0 10px;font-size:14px}
     .muted{color:var(--muted);font-size:12px}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
     .row1{display:grid;grid-template-columns:1fr;gap:10px}
     label{display:block;font-size:12px;color:var(--muted);margin:0 0 6px}
     input, select, textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--text);padding:10px;border-radius:12px;outline:none}
@@ -68,6 +69,11 @@
     .kpi .v{font-size:16px;font-weight:800;margin-top:4px}
     .smallbtn{padding:8px 10px;border-radius:12px;font-size:12px}
     .hidden{display:none !important}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap}
+    .tab{padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);cursor:pointer;font-weight:700;font-size:12px}
+    .tab.active{background:rgba(57,190,229,.16);border-color:rgba(57,190,229,.45)}
+    .panel{margin-top:10px}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
   </style>
 </head>
 
@@ -78,24 +84,25 @@
       <div class="logo"></div>
       <div>
         <h1>APLSL B2B Medicine Order Portal</h1>
-        <p>Login (SheetDB) → Select Category → Add Qty → GST → PDF → Save Order to SheetDB → WhatsApp</p>
+        <p>SheetDB: Login + Products + Rates + Orders + HSN + Product GST + PDF + WhatsApp + Admin</p>
       </div>
     </div>
     <div class="actions">
       <div class="pill" id="sessionPill">Not logged in</div>
       <button class="secondary smallbtn" id="btnLogout" disabled>Logout</button>
-      <button class="danger smallbtn" id="btnClearLocal" title="Clears local session/cart only">Clear Local</button>
+      <button class="danger smallbtn" id="btnClearLocal" title="Clears local cart/session only">Clear Local</button>
     </div>
   </div>
 
   <div class="grid">
     <!-- LEFT -->
     <div class="card">
-      <h2>1) Login via Mail ID + Password (SheetDB)</h2>
+      <h2>1) Login via Mail ID + Password</h2>
 
       <div class="hint">
         SheetDB Base: <span class="tag" id="sheetdbTag"></span>
-        <div class="hint">Sheets required: <b>users</b>, <b>orders</b>. (products optional)</div>
+        <div class="hint">Sheets: <b>users</b>, <b>orders</b>, <b>products</b>, <b>rates</b></div>
+        <div class="hint" id="syncStatus"></div>
       </div>
 
       <div id="authBox">
@@ -131,6 +138,7 @@
               <option>Hospital</option>
               <option>Clinic</option>
             </select>
+            <div class="hint">Company rate from <b>rates</b> (state + role + product). GST from <b>products.gst_percent</b>.</div>
           </div>
         </div>
 
@@ -184,8 +192,9 @@
             <div class="hint">Seller state assumed = <b>Gujarat</b>. Gujarat → CGST+SGST, other → IGST.</div>
           </div>
           <div>
-            <label>GST % (editable)</label>
-            <input id="gstPercent" type="number" min="0" step="0.01" value="12">
+            <label>Default GST % (fallback)</label>
+            <input id="gstFallback" type="number" min="0" step="0.01" value="12">
+            <div class="hint">Used only if product GST% is blank in Sheet.</div>
           </div>
         </div>
 
@@ -209,6 +218,134 @@
             <input id="invoiceDate" type="date">
           </div>
         </div>
+
+        <div class="right" style="margin-top:10px">
+          <button class="secondary smallbtn" id="btnReloadFromSheet">Reload Products & Rates</button>
+        </div>
+
+        <div id="adminGate" class="hidden">
+          <div class="sep"></div>
+          <h2>6) Admin Panel (Edit Products + Rates)</h2>
+          <div class="tabs">
+            <div class="tab active" id="tabProducts">Products</div>
+            <div class="tab" id="tabRates">Rates</div>
+          </div>
+
+          <!-- PRODUCTS PANEL -->
+          <div class="panel" id="panelProducts">
+            <div class="hint">
+              Edit columns: <b>product_name, strength, product_type, pack, category, class, therapeutic_indication, mrp, hsn, gst_percent</b>
+            </div>
+
+            <div class="row3" style="margin-top:10px">
+              <div>
+                <label>Product Name *</label>
+                <input id="p_name" placeholder="AZIN-500">
+              </div>
+              <div>
+                <label>HSN</label>
+                <input id="p_hsn" placeholder="e.g., 3004">
+              </div>
+              <div>
+                <label>GST %</label>
+                <input id="p_gst" type="number" step="0.01" placeholder="e.g., 12">
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
+                <label>Strength</label>
+                <input id="p_strength" placeholder="Azithromycin Tablets I.P 500 mg">
+              </div>
+              <div>
+                <label>Product Type</label>
+                <input id="p_type" placeholder="Tablet / Capsule / Syrup / Cream">
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
+                <label>Pack</label>
+                <input id="p_pack" placeholder="10X3">
+              </div>
+              <div>
+                <label>MRP</label>
+                <input id="p_mrp" placeholder="95">
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
+                <label>Category</label>
+                <input id="p_category" placeholder="Anti-Infective / Antibiotic">
+              </div>
+              <div>
+                <label>Class</label>
+                <input id="p_class" placeholder="Rx / OTC">
+              </div>
+            </div>
+
+            <div class="row1">
+              <div>
+                <label>Therapeutic Indication</label>
+                <textarea id="p_indication" placeholder="Indication..."></textarea>
+              </div>
+            </div>
+
+            <div class="right" style="margin-top:10px">
+              <button class="secondary smallbtn" id="btnProdFillFromSelected">Fill From Existing</button>
+              <button class="smallbtn" id="btnProdUpsert">Save / Update Product</button>
+              <button class="danger smallbtn" id="btnProdDelete">Delete Product</button>
+            </div>
+            <div class="hint" id="adminProdMsg"></div>
+          </div>
+
+          <!-- RATES PANEL -->
+          <div class="panel hidden" id="panelRates">
+            <div class="hint">
+              Rates sheet MUST have column <b>key</b>. Key = <span class="mono">STATE|ROLE|PRODUCT</span><br>
+              Example: <span class="mono">GJ|Retailer|AZIN-500</span> or <span class="mono">ALL|Retailer|__DEFAULT__</span>
+            </div>
+
+            <div class="row3" style="margin-top:10px">
+              <div>
+                <label>State *</label>
+                <input id="r_state" placeholder="GJ or ALL">
+              </div>
+              <div>
+                <label>Role *</label>
+                <input id="r_role" placeholder="Retailer / Doctor / Hospital ...">
+              </div>
+              <div>
+                <label>Product Name *</label>
+                <input id="r_product" placeholder="AZIN-500 or __DEFAULT__">
+              </div>
+            </div>
+
+            <div class="row">
+              <div>
+                <label>Rate (Company) *</label>
+                <input id="r_rate" type="number" step="0.01" placeholder="72">
+              </div>
+              <div>
+                <label>Auto Key</label>
+                <input id="r_key" readonly>
+                <div class="hint">Generated automatically (required for update/delete).</div>
+              </div>
+            </div>
+
+            <div class="right" style="margin-top:10px">
+              <button class="smallbtn" id="btnRateUpsert">Save / Update Rate</button>
+              <button class="danger smallbtn" id="btnRateDelete">Delete Rate</button>
+            </div>
+            <div class="hint" id="adminRateMsg"></div>
+          </div>
+
+          <div class="right" style="margin-top:10px">
+            <button class="secondary smallbtn" id="btnAdminReload">Reload Admin Data</button>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -219,15 +356,14 @@
       <div class="row">
         <div>
           <label>Search</label>
-          <input id="search" placeholder="Search by Product Name / Strength / Category / Class...">
+          <input id="search" placeholder="Search by Product / Strength / Category / Class...">
         </div>
         <div>
           <label>Quick Actions</label>
           <div class="right">
             <button class="secondary smallbtn" id="btnResetQty">Reset Qty</button>
-            <button class="secondary smallbtn" id="btnLoadDemoRates">Load Sample Company Rates</button>
           </div>
-          <div class="hint">Replace company rates inside code (search: <b>companyRatesByRole</b>).</div>
+          <div class="hint">Products + HSN + GST% come from SheetDB: <b>products</b></div>
         </div>
       </div>
 
@@ -238,12 +374,14 @@
               <th>Sr.</th>
               <th>Product</th>
               <th>Strength</th>
+              <th>HSN</th>
+              <th>GST%</th>
               <th>Type</th>
               <th>Pack</th>
               <th>Category</th>
               <th>Class</th>
               <th>Indication</th>
-              <th>MRP / Strip</th>
+              <th>MRP</th>
               <th>Company Rate</th>
               <th>Qty</th>
             </tr>
@@ -253,7 +391,7 @@
       </div>
 
       <div class="sep"></div>
-      <h2>4) Cart & Checkout (GST + Totals)</h2>
+      <h2>4) Cart & Checkout (Product GST + Totals)</h2>
 
       <div class="totals">
         <div class="kpi">
@@ -261,7 +399,7 @@
           <div class="v" id="subTotal">₹0.00</div>
         </div>
         <div class="kpi">
-          <div class="muted">GST Total</div>
+          <div class="muted">GST Total (product-wise)</div>
           <div class="v" id="gstTotal">₹0.00</div>
         </div>
         <div class="kpi">
@@ -313,94 +451,92 @@
       <div class="right" style="margin-top:10px">
         <button class="secondary smallbtn" id="btnRefreshHistory">Refresh History</button>
       </div>
-
-      <div class="hint">
-        ✅ Order stored in Google Sheet via SheetDB.  
-        If you want **auto email to Ahanitya**, add a Google Sheet Apps Script trigger (code provided below message).
-      </div>
     </div>
   </div>
 </div>
 
 <script>
 /* =========================
-   SHEETDB CONFIG
+   CONFIG
 ========================= */
-const SHEETDB_BASE = "https://sheetdb.io/api/v1/oq0xux451r2tn"; // your SheetDB
+const SHEETDB_BASE = "https://sheetdb.io/api/v1/oq0xux451r2tn";
 const SHEET_USERS  = "users";
 const SHEET_ORDERS = "orders";
+const SHEET_PRODUCTS = "products";
+const SHEET_RATES = "rates";
 
-/* =========================
-   BUSINESS CONFIG
-========================= */
 const SELLER_STATE = "GJ";
 const DEST_WA = "918487090212"; // +91 8487090212
 const APLSL_EMAIL = "infoahanityapharmalifescellp@gmail.com";
 
+/** Admin emails allowed to see Admin Panel */
+const ADMIN_EMAILS = ["infoahanityapharmalifescellp@gmail.com"]; // edit if needed
+
 /* =========================
-   UI HELPERS
+   HELPERS
 ========================= */
 const el = (id)=> document.getElementById(id);
 function setAuthMsg(msg, type=""){ el("authMsg").innerHTML = type ? `<span class="${type}">${msg}</span>` : msg; }
 function setCheckoutMsg(msg, type=""){ el("checkoutMsg").innerHTML = type ? `<span class="${type}">${msg}</span>` : msg; }
+function setSyncStatus(msg, type=""){ el("syncStatus").innerHTML = type ? `<span class="${type}">${msg}</span>` : msg; }
 function money(n){ const x = Number(n||0); return "₹" + x.toFixed(2); }
 function todayISO(){ const d=new Date(); const p=(x)=>String(x).padStart(2,"0"); return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()); }
 function nowNice(){ return new Date().toLocaleString(); }
 function escapeQuotes(s){ return String(s).replaceAll("\\","\\\\").replaceAll("'","\\'"); }
-
-/* =========================
-   LOCAL SESSION ONLY
-========================= */
-const LS_SESSION = "aplsl_session_sheetdb_v1";
-let session = (()=>{ try{ return JSON.parse(localStorage.getItem(LS_SESSION)||"null"); }catch(e){return null;} })();
-
-/* =========================
-   PRODUCTS (your list)
-========================= */
-let products = [
-  { sr:1, name:"AZIN-500", strength:"Azithromycin Tablets I.P 500 mg", type:"Tablet", pack:"10X3", category:"Anti-Infective / Antibiotic", class:"Rx", indication:"Bacterial infections, Respiratory tract infections (Bronchitis, Pneumonia), ENT infections (Pharyngitis, Tonsillitis, Sinusitis)", mrp:95 },
-  { sr:2, name:"ASP", strength:"Aceclofenac 100mg + Paracetamol 325mg + Serratiopeptidase 15 mg", type:"Tablet", pack:"10X10", category:"Analgesic & Anti-Inflammatory", class:"Rx", indication:"Relief of pain, inflammation, and swelling in arthritis, trauma, dental pain, post-surgery, and musculoskeletal disorders.", mrp:150 },
-  { sr:3, name:"A-SUNAC", strength:"Aceclofenac 100 mg, Paracetamol 325mg", type:"Tablet", pack:"10X10", category:"Analgesic, Antipyretic, Anti-inflammatory & Anti-cold preparation", class:"Rx", indication:"Relief from cold, flu, fever, headache, body pain & nasal congestion.", mrp:80 },
-  { sr:4, name:"APLSL-DiaMet", strength:"Glimepiride 2 mg + Metformin HCl (ER)", type:"Tablet", pack:"—", category:"Anti-diabetic", class:"Rx", indication:"Type 2 diabetes management", mrp:null },
-  { sr:5, name:"APLSL-Lulizid", strength:"Luliconazole 1%", type:"Cream", pack:"—", category:"Antifungal", class:"Rx", indication:"Skin fungal infections", mrp:null },
-  { sr:6, name:"Ahanitya-Ketozin", strength:"Ketoconazole 2%", type:"Shampoo", pack:"—", category:"Antifungal", class:"OTC", indication:"Dandruff, seborrheic dermatitis", mrp:null },
-  { sr:7, name:"APLSL-Cutiderm", strength:"Itraconazole 1% + Ofloxacin 0.75% + Ornidazole 2% + Clobetasol 0.05%", type:"Cream", pack:"—", category:"Antifungal & Antibacterial", class:"Rx", indication:"Fungal & bacterial skin infections", mrp:null },
-  { sr:8, name:"Ahanitya-AmbroLev", strength:"Ambroxol 60mg + Levocetirizine 2.5mg + Paracetamol 500mg + Phenylephrine 5mg", type:"Tablet", pack:"—", category:"Cold & Flu Relief", class:"Rx", indication:"Relief from cough, cold, nasal congestion, and fever", mrp:null },
-  { sr:9, name:"PANTO-DSR", strength:"Pantoprazole 40 mg + Domperidone 30 mg", type:"Capsule", pack:"10X10", category:"Gastrointestinal", class:"Rx", indication:"Acid reflux, GERD, indigestion", mrp:170 },
-  { sr:10, name:"LE-MONT", strength:"Montelukast 10 mg + Levocetirizine 5 mg", type:"Tablet", pack:"20X10", category:"Anti-allergic (LTRA + Antihistamine)", class:"Rx", indication:"Allergic rhinitis (seasonal & perennial), allergic cough, nasal congestion, sneezing, runny nose.", mrp:180 }
-];
-
-/* =========================
-   COMPANY RATES (EDIT HERE)
-   Format:
-   companyRatesByRole[stateCode][role][productName] = rate
-   Use "ALL" for default state; "__DEFAULT__" for default product.
-========================= */
-let companyRatesByRole = {
-  "ALL": {
-    "Retailer": { "__DEFAULT__": 120, "AZIN-500": 72, "ASP": 105, "A-SUNAC": 55, "PANTO-DSR": 120, "LE-MONT": 130 },
-    "Wholesaler/Stockist": { "__DEFAULT__": 110, "AZIN-500": 68, "ASP": 98, "A-SUNAC": 50, "PANTO-DSR": 112, "LE-MONT": 122 },
-    "Doctor": { "__DEFAULT__": 130, "AZIN-500": 78, "ASP": 112, "A-SUNAC": 60, "PANTO-DSR": 128, "LE-MONT": 138 },
-    "Hospital": { "__DEFAULT__": 125, "AZIN-500": 76, "ASP": 110, "A-SUNAC": 58, "PANTO-DSR": 125, "LE-MONT": 135 },
-    "Clinic": { "__DEFAULT__": 125 }
-  }
-};
-
-/* =========================
-   CRYPTO (PASSWORD HASH)
-========================= */
-async function sha256(text){
-  const enc = new TextEncoder().encode(text);
-  const buf = await crypto.subtle.digest("SHA-256", enc);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+function isAdminEmail(email){ return ADMIN_EMAILS.map(x=>x.toLowerCase()).includes(String(email||"").toLowerCase()); }
+function normalizeMrp(v){
+  if(v == null) return null;
+  const s = String(v).trim();
+  if(!s || s === "—" || s === "-") return null;
+  const num = Number(s.replace(/[^\d.]/g,""));
+  return isFinite(num) ? num : null;
+}
+function normalizeGst(v){
+  if(v == null) return null;
+  const s = String(v).trim();
+  if(!s || s === "—" || s === "-") return null;
+  const num = Number(s.replace(/[^\d.]/g,""));
+  return isFinite(num) ? num : null;
+}
+function getFallbackGST(){
+  const v=Number(el("gstFallback").value);
+  return isFinite(v)?Math.max(0,v):0;
 }
 
 /* =========================
-   SHEETDB HELPERS
+   LOCAL SESSION
 ========================= */
-async function sheetGet(path){
-  const r = await fetch(`${SHEETDB_BASE}/${path}`, { method:"GET" });
-  if(!r.ok) throw new Error(`SheetDB GET failed (${r.status})`);
+const LS_SESSION = "aplsl_session_sheetdb_admin_v1";
+let session = (()=>{ try{ return JSON.parse(localStorage.getItem(LS_SESSION)||"null"); }catch(e){return null;} })();
+
+/* =========================
+   FALLBACK PRODUCTS
+========================= */
+const fallbackProducts = [
+  { sr:1, name:"AZIN-500", strength:"Azithromycin Tablets I.P 500 mg", hsn:"", gst_percent:12, type:"Tablet", pack:"10X3", category:"Anti-Infective / Antibiotic", class:"Rx", indication:"Bacterial infections, Respiratory tract infections (Bronchitis, Pneumonia), ENT infections (Pharyngitis, Tonsillitis, Sinusitis)", mrp:95 },
+  { sr:2, name:"ASP", strength:"Aceclofenac 100mg + Paracetamol 325mg + Serratiopeptidase 15 mg", hsn:"", gst_percent:12, type:"Tablet", pack:"10X10", category:"Analgesic & Anti-Inflammatory", class:"Rx", indication:"Relief of pain, inflammation, and swelling in arthritis, trauma, dental pain, post-surgery, and musculoskeletal disorders.", mrp:150 },
+  { sr:3, name:"A-SUNAC", strength:"Aceclofenac 100 mg, Paracetamol 325mg", hsn:"", gst_percent:12, type:"Tablet", pack:"10X10", category:"Analgesic, Antipyretic, Anti-inflammatory & Anti-cold preparation", class:"Rx", indication:"Relief from cold, flu, fever, headache, body pain & nasal congestion.", mrp:80 },
+  { sr:4, name:"APLSL-DiaMet", strength:"Glimepiride 2 mg + Metformin HCl (ER)", hsn:"", gst_percent:null, type:"Tablet", pack:"—", category:"Anti-diabetic", class:"Rx", indication:"Type 2 diabetes management", mrp:null },
+  { sr:5, name:"APLSL-Lulizid", strength:"Luliconazole 1%", hsn:"", gst_percent:null, type:"Cream", pack:"—", category:"Antifungal", class:"Rx", indication:"Skin fungal infections", mrp:null },
+  { sr:6, name:"Ahanitya-Ketozin", strength:"Ketoconazole 2%", hsn:"", gst_percent:null, type:"Shampoo", pack:"—", category:"Antifungal", class:"OTC", indication:"Dandruff, seborrheic dermatitis", mrp:null },
+  { sr:7, name:"APLSL-Cutiderm", strength:"Itraconazole 1% + Ofloxacin 0.75% + Ornidazole 2% + Clobetasol 0.05%", hsn:"", gst_percent:null, type:"Cream", pack:"—", category:"Antifungal & Antibacterial", class:"Rx", indication:"Fungal & bacterial skin infections", mrp:null },
+  { sr:8, name:"Ahanitya-AmbroLev", strength:"Ambroxol 60mg + Levocetirizine 2.5mg + Paracetamol 500mg + Phenylephrine 5mg", hsn:"", gst_percent:null, type:"Tablet", pack:"—", category:"Cold & Flu Relief", class:"Rx", indication:"Relief from cough, cold, nasal congestion, and fever", mrp:null },
+  { sr:9, name:"PANTO-DSR", strength:"Pantoprazole 40 mg + Domperidone 30 mg", hsn:"", gst_percent:12, type:"Capsule", pack:"10X10", category:"Gastrointestinal", class:"Rx", indication:"Acid reflux, GERD, indigestion", mrp:170 },
+  { sr:10, name:"LE-MONT", strength:"Montelukast 10 mg + Levocetirizine 5 mg", hsn:"", gst_percent:12, type:"Tablet", pack:"20X10", category:"Anti-allergic (LTRA + Antihistamine)", class:"Rx", indication:"Allergic rhinitis (seasonal & perennial), allergic cough, nasal congestion, sneezing, runny nose.", mrp:180 }
+];
+
+let products = [...fallbackProducts];
+
+/** ratesMap[state][role][product] = rate */
+let ratesMap = {};
+
+/* =========================
+   SHEETDB HELPERS (GET/POST/PATCH/DELETE)
+   Based on SheetDB docs: PATCH /{COLUMN}/{VALUE}?sheet=TAB  |  DELETE /{COLUMN}/{VALUE}?sheet=TAB
+========================= */
+async function sheetGetSheet(sheetName){
+  const r = await fetch(`${SHEETDB_BASE}/${sheetName}`, { method:"GET" });
+  if(!r.ok) throw new Error(`SheetDB GET ${sheetName} failed (${r.status})`);
   return await r.json();
 }
 async function sheetPost(sheetName, rowObj){
@@ -410,49 +546,171 @@ async function sheetPost(sheetName, rowObj){
     body: JSON.stringify({ data: [rowObj] })
   });
   const data = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(`SheetDB POST failed (${r.status})`);
-  // SheetDB returns {created: 1} typically
+  if(!r.ok) throw new Error(`SheetDB POST ${sheetName} failed (${r.status})`);
   return data;
 }
 async function sheetSearch(sheetName, field, value){
   const url = `${SHEETDB_BASE}/${sheetName}/search?${encodeURIComponent(field)}=${encodeURIComponent(value)}`;
   const r = await fetch(url, { method:"GET" });
-  if(!r.ok) throw new Error(`SheetDB SEARCH failed (${r.status})`);
+  if(!r.ok) throw new Error(`SheetDB SEARCH ${sheetName} failed (${r.status})`);
   return await r.json();
+}
+async function sheetPatchBy(sheetTab, column, value, patchObj){
+  const url = `${SHEETDB_BASE}/${encodeURIComponent(column)}/${encodeURIComponent(value)}?sheet=${encodeURIComponent(sheetTab)}`;
+  const r = await fetch(url, {
+    method:"PATCH",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ data: patchObj })
+  });
+  const data = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(`SheetDB PATCH ${sheetTab} failed (${r.status})`);
+  return data;
+}
+async function sheetDeleteBy(sheetTab, column, value){
+  const url = `${SHEETDB_BASE}/${encodeURIComponent(column)}/${encodeURIComponent(value)}?sheet=${encodeURIComponent(sheetTab)}`;
+  const r = await fetch(url, { method:"DELETE" });
+  const data = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(`SheetDB DELETE ${sheetTab} failed (${r.status})`);
+  return data;
 }
 
 /* =========================
-   UI STATE
+   LOAD PRODUCTS + RATES
+========================= */
+async function loadProductsFromSheet(){
+  const rows = await sheetGetSheet(SHEET_PRODUCTS);
+  if(!Array.isArray(rows) || rows.length === 0) return null;
+
+  const mapped = rows
+    .map(r => ({
+      sr: Number(r.sr) || 0,
+      name: String(r.product_name || r.name || "").trim(),
+      strength: String(r.strength || "").trim(),
+      type: String(r.product_type || r.type || "").trim(),
+      pack: String(r.pack || "").trim(),
+      category: String(r.category || "").trim(),
+      class: String(r.class || "").trim(),
+      indication: String(r.therapeutic_indication || r.indication || "").trim(),
+      mrp: normalizeMrp(r.mrp),
+      hsn: String(r.hsn || "").trim(),
+      gst_percent: normalizeGst(r.gst_percent)
+    }))
+    .filter(p => p.name);
+
+  mapped.forEach((p,i)=> { if(!p.sr) p.sr = i+1; });
+  mapped.sort((a,b)=> a.sr - b.sr);
+  return mapped.length ? mapped : null;
+}
+
+async function loadRatesFromSheet(){
+  const rows = await sheetGetSheet(SHEET_RATES);
+  if(!Array.isArray(rows) || rows.length === 0) return null;
+
+  const map = {};
+  let keyMissing = false;
+
+  for(const r of rows){
+    const key = String(r.key || "").trim();
+    const state = String(r.state || "ALL").trim() || "ALL";
+    const role = String(r.role || "").trim();
+    const product = String(r.product_name || "").trim();
+    const rate = Number(String(r.rate || "").trim());
+
+    if(!key) keyMissing = true;
+    if(!role || !product) continue;
+    if(!isFinite(rate)) continue;
+
+    map[state] ??= {};
+    map[state][role] ??= {};
+    map[state][role][product] = rate;
+  }
+
+  return { map, keyMissing };
+}
+
+async function reloadProductsAndRates(){
+  try{
+    setSyncStatus("Loading products & rates from SheetDB…", "warn");
+
+    const [p, rates] = await Promise.all([
+      loadProductsFromSheet().catch(()=>null),
+      loadRatesFromSheet().catch(()=>null)
+    ]);
+
+    if(p) products = p;
+
+    let ratesOk = false;
+    if(rates?.map){
+      ratesMap = rates.map;
+      ratesOk = Object.keys(ratesMap||{}).length > 0;
+      if(rates.keyMissing){
+        setSyncStatus(`✅ Products loaded (${products.length}). ⚠️ Rates loaded but "key" column missing in rates sheet. Admin update/delete will be unsafe. Please add key column.`, "warn");
+      }else{
+        setSyncStatus(`✅ Loaded: Products ${products.length} | Rates ${ratesOk ? "Yes" : "No"} | HSN/GST from products`, "ok");
+      }
+    }else{
+      ratesMap = {};
+      setSyncStatus(`✅ Loaded: Products ${products.length} | Rates not found (fallback to MRP)`, "warn");
+    }
+
+  }catch(e){
+    setSyncStatus("❌ Failed to load from SheetDB. Using fallback products.", "bad");
+  }finally{
+    renderTable();
+    recalcTotals();
+  }
+}
+
+/* =========================
+   CART + PRICING + PRODUCT GST
 ========================= */
 let cartQty = {};
 function getRole(){ return (el("category").value||"").trim(); }
 function getState(){ return (el("partyState").value||"").trim(); }
-function getGSTPercent(){ const v=Number(el("gstPercent").value); return isFinite(v)?Math.max(0,v):0; }
 
 function getRateFor(p){
-  const role=getRole(), st=getState(), name=p.name;
-  const rates=companyRatesByRole||{};
-  const tryGet=(a,b,c)=>rates?.[a]?.[b]?.[c];
-  let r = tryGet(st,role,name) ?? tryGet(st,role,"__DEFAULT__") ?? tryGet("ALL",role,name) ?? tryGet("ALL",role,"__DEFAULT__");
-  if(r==null) r = (p.mrp!=null) ? p.mrp : 0;
-  r=Number(r); return isFinite(r)?r:0;
+  const role = getRole();
+  const st = getState();
+  const name = p.name;
+  const tryGet = (a,b,c)=> ratesMap?.[a]?.[b]?.[c];
+
+  let r =
+    tryGet(st, role, name) ??
+    tryGet(st, role, "__DEFAULT__") ??
+    tryGet("ALL", role, name) ??
+    tryGet("ALL", role, "__DEFAULT__");
+
+  if(r == null) r = (p.mrp != null) ? p.mrp : 0;
+  r = Number(r);
+  return isFinite(r) ? r : 0;
 }
+
+function getGstForProduct(p){
+  // product-wise gst, fallback to default gstFallback
+  const pv = (p.gst_percent == null) ? null : Number(p.gst_percent);
+  if(pv != null && isFinite(pv)) return Math.max(0,pv);
+  return getFallbackGST();
+}
+
 function getCartItems(){
   const items=[];
   for(const p of products){
     const qty=Number(cartQty[p.name]||0);
     if(qty>0){
       const rate=getRateFor(p);
-      items.push({...p, qty, rate, amount: rate*qty});
+      const amount = rate*qty;
+      const gstPct = getGstForProduct(p);
+      const gstAmt = amount*(gstPct/100);
+      items.push({...p, qty, rate, amount, gstPct, gstAmt});
     }
   }
   return items;
 }
+
 function recalcTotals(){
   const items=getCartItems();
   const sub=items.reduce((a,i)=>a+i.amount,0);
-  const gstPct=getGSTPercent();
-  const gst=sub*(gstPct/100);
+  const gst=items.reduce((a,i)=>a+i.gstAmt,0);
   const grand=sub+gst;
 
   el("subTotal").textContent=money(sub);
@@ -473,13 +731,17 @@ function recalcTotals(){
     el("gstSplitHint").textContent="Inter-state billing.";
   }
 }
+
+/* =========================
+   RENDER TABLE
+========================= */
 function renderTable(){
   const q=(el("search").value||"").toLowerCase().trim();
   const role=getRole(), st=getState();
 
   const filtered=products.filter(p=>{
     if(!q) return true;
-    const blob=`${p.sr} ${p.name} ${p.strength} ${p.type} ${p.pack} ${p.category} ${p.class} ${p.indication}`.toLowerCase();
+    const blob=`${p.sr} ${p.name} ${p.strength} ${p.hsn} ${p.type} ${p.pack} ${p.category} ${p.class} ${p.indication}`.toLowerCase();
     return blob.includes(q);
   });
 
@@ -487,13 +749,18 @@ function renderTable(){
     const qty=Number(cartQty[p.name]||0);
     const mrpText=(p.mrp==null)?"—":`₹ ${p.mrp}/-`;
     const rate=getRateFor(p);
+    const gstPct=getGstForProduct(p);
+
     const roleOk = role ? `<span class="tag">${role}</span>` : `<span class="tag warn">Select Category</span>`;
     const stOk = st ? `<span class="tag">${st}</span>` : `<span class="tag warn">Select State</span>`;
+
     return `
       <tr>
         <td>${p.sr}</td>
         <td><b>${p.name}</b><div class="hint">${roleOk} ${stOk}</div></td>
         <td>${p.strength}</td>
+        <td>${p.hsn || "—"}</td>
+        <td>${isFinite(gstPct)? gstPct.toFixed(2) : "—"}</td>
         <td>${p.type}</td>
         <td>${p.pack}</td>
         <td>${p.category}</td>
@@ -518,7 +785,7 @@ window.setQty = (name,val)=>{ let n=Number(val); if(!isFinite(n)) n=0; cartQty[n
 /* =========================
    INVOICE NO (AUTO)
 ========================= */
-const LS_INV = "aplsl_invoice_counter_v2";
+const LS_INV = "aplsl_invoice_counter_v4";
 function getInvoiceNo(){
   const manual=(el("invoiceNo").value||"").trim();
   if(manual) return manual;
@@ -545,11 +812,11 @@ function validateBeforeCheckout(){
   if(getCartItems().length===0) return "Please add at least 1 item quantity.";
   return "";
 }
+
 function buildOrder(){
   const items=getCartItems();
   const sub=items.reduce((a,i)=>a+i.amount,0);
-  const gstPct=getGSTPercent();
-  const gst=sub*(gstPct/100);
+  const gst=items.reduce((a,i)=>a+i.gstAmt,0);
   const grand=sub+gst;
 
   const invNo=getInvoiceNo();
@@ -577,7 +844,6 @@ function buildOrder(){
     partyState: st,
     partyAddress: (el("partyAddress").value||"").trim(),
 
-    gstPercent: gstPct,
     subtotal: sub,
     cgst, sgst, igst,
     gstTotal: gst,
@@ -587,6 +853,7 @@ function buildOrder(){
     items
   };
 }
+
 function buildMessage(order){
   const lines=[];
   lines.push("🧾 APLSL B2B Order (Ahanitya Pharma Life Science LLP)");
@@ -602,16 +869,16 @@ function buildMessage(order){
   lines.push(`State: ${order.partyState}`);
   if(order.partyAddress) lines.push(`Address: ${order.partyAddress}`);
   lines.push("");
-  lines.push("💊 Items");
+  lines.push("💊 Items (HSN + GST%)");
   order.items.forEach((it,idx)=>{
-    lines.push(`${idx+1}) ${it.name} | ${it.strength} | Pack: ${it.pack} | Rate: ₹${it.rate.toFixed(2)} | Qty: ${it.qty} | Amt: ₹${it.amount.toFixed(2)}`);
+    lines.push(`${idx+1}) ${it.name} | HSN: ${it.hsn||"-"} | GST%: ${it.gstPct.toFixed(2)} | Rate: ₹${it.rate.toFixed(2)} | Qty: ${it.qty} | Amt: ₹${it.amount.toFixed(2)} | GST: ₹${it.gstAmt.toFixed(2)}`);
   });
   lines.push("");
   lines.push(`Subtotal: ₹${order.subtotal.toFixed(2)}`);
   if(order.partyState===SELLER_STATE){
-    lines.push(`GST (${order.gstPercent}%): ₹${order.gstTotal.toFixed(2)} (CGST ₹${order.cgst.toFixed(2)} + SGST ₹${order.sgst.toFixed(2)})`);
+    lines.push(`GST Total: ₹${order.gstTotal.toFixed(2)} (CGST ₹${order.cgst.toFixed(2)} + SGST ₹${order.sgst.toFixed(2)})`);
   }else{
-    lines.push(`GST (${order.gstPercent}%): ₹${order.gstTotal.toFixed(2)} (IGST ₹${order.igst.toFixed(2)})`);
+    lines.push(`GST Total: ₹${order.gstTotal.toFixed(2)} (IGST ₹${order.igst.toFixed(2)})`);
   }
   lines.push(`Grand Total: ₹${order.grandTotal.toFixed(2)}`);
   if(order.notes){ lines.push(""); lines.push("📝 Notes"); lines.push(order.notes); }
@@ -620,8 +887,13 @@ function buildMessage(order){
   return lines.join("\n");
 }
 
+function openWhatsApp(order){
+  const text = encodeURIComponent(buildMessage(order));
+  window.open(`https://wa.me/${DEST_WA}?text=${text}`, "_blank");
+}
+
 /* =========================
-   PDF
+   PDF (includes HSN + GST%)
 ========================= */
 async function generatePDF(order){
   const { jsPDF } = window.jspdf || {};
@@ -648,13 +920,19 @@ async function generatePDF(order){
   if(order.partyAddress) doc.text(`Address: ${order.partyAddress}`, margin, 78, {maxWidth:185});
 
   const rows=order.items.map((it,i)=>[
-    String(i+1), it.name, it.strength, it.type, it.pack,
-    `₹${it.rate.toFixed(2)}`, String(it.qty), `₹${it.amount.toFixed(2)}`
+    String(i+1),
+    it.name,
+    (it.hsn||"—"),
+    it.gstPct.toFixed(2),
+    `₹${it.rate.toFixed(2)}`,
+    String(it.qty),
+    `₹${it.amount.toFixed(2)}`,
+    `₹${it.gstAmt.toFixed(2)}`
   ]);
 
   doc.autoTable({
     startY: order.partyAddress ? 86 : 82,
-    head: [["Sr","Product","Strength","Type","Pack","Rate","Qty","Amount"]],
+    head: [["Sr","Product","HSN","GST%","Rate","Qty","Amount","GST"]],
     body: rows,
     styles: { fontSize: 8 },
     headStyles: { fillColor: [17, 121, 154] },
@@ -667,9 +945,9 @@ async function generatePDF(order){
   y+=6;
   doc.setFont("helvetica","normal");
   if(order.partyState===SELLER_STATE){
-    doc.text(`GST (${order.gstPercent}%): ₹${order.gstTotal.toFixed(2)} (CGST ₹${order.cgst.toFixed(2)} + SGST ₹${order.sgst.toFixed(2)})`, margin, y);
+    doc.text(`GST Total: ₹${order.gstTotal.toFixed(2)} (CGST ₹${order.cgst.toFixed(2)} + SGST ₹${order.sgst.toFixed(2)})`, margin, y);
   }else{
-    doc.text(`GST (${order.gstPercent}%): ₹${order.gstTotal.toFixed(2)} (IGST ₹${order.igst.toFixed(2)})`, margin, y);
+    doc.text(`GST Total: ₹${order.gstTotal.toFixed(2)} (IGST ₹${order.igst.toFixed(2)})`, margin, y);
   }
   y+=6;
   doc.setFont("helvetica","bold");
@@ -682,37 +960,29 @@ async function generatePDF(order){
 }
 
 /* =========================
-   AUTH via SheetDB
-   users columns recommended:
-   email | pass_hash | created_at
+   AUTH (users)
 ========================= */
+async function sha256(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
 async function signupSheetDB(email, pass){
   const pass_hash = await sha256(pass);
-  // check if exists
   const existing = await sheetSearch(SHEET_USERS, "email", email);
-  if(Array.isArray(existing) && existing.length > 0){
-    throw new Error("Account already exists. Please login.");
-  }
-  await sheetPost(SHEET_USERS, {
-    email,
-    pass_hash,
-    created_at: new Date().toISOString()
-  });
+  if(Array.isArray(existing) && existing.length > 0) throw new Error("Account already exists. Please login.");
+  await sheetPost(SHEET_USERS, { email, pass_hash, created_at: new Date().toISOString() });
 }
 async function loginSheetDB(email, pass){
   const rows = await sheetSearch(SHEET_USERS, "email", email);
   if(!Array.isArray(rows) || rows.length === 0) throw new Error("Account not found. Please create account.");
   const pass_hash = await sha256(pass);
-  const ok = String(rows[0].pass_hash || "") === pass_hash;
-  if(!ok) throw new Error("Invalid password.");
+  if(String(rows[0].pass_hash||"") !== pass_hash) throw new Error("Invalid password.");
   return true;
 }
 
 /* =========================
-   ORDER → SheetDB
-   orders columns recommended:
-   created_at | invoice_no | invoice_date | login_email | role | party_name | party_mobile | party_email | gstin | state | address
-   gst_percent | subtotal | cgst | sgst | igst | gst_total | grand_total | notes | items_json
+   ORDERS (orders)
 ========================= */
 async function submitOrderToSheet(order){
   const row = {
@@ -731,7 +1001,6 @@ async function submitOrderToSheet(order){
     state: order.partyState,
     address: order.partyAddress,
 
-    gst_percent: order.gstPercent,
     subtotal: order.subtotal,
     cgst: order.cgst,
     sgst: order.sgst,
@@ -748,7 +1017,6 @@ async function submitOrderToSheet(order){
 async function loadHistoryFromSheet(){
   if(!session?.email) return [];
   const rows = await sheetSearch(SHEET_ORDERS, "login_email", session.email);
-  // sort newest first by created_at if available
   if(Array.isArray(rows)){
     rows.sort((a,b)=> String(b.created_at||"").localeCompare(String(a.created_at||"")));
   }
@@ -777,31 +1045,6 @@ function renderHistory(rows){
   }).join("");
 }
 
-function openWhatsApp(order){
-  const text = encodeURIComponent(buildMessage(order));
-  window.open(`https://wa.me/${DEST_WA}?text=${text}`, "_blank");
-}
-
-/* =========================
-   SESSION UI
-========================= */
-function syncSessionUI(){
-  const loggedIn = !!session?.email;
-  el("authBox").classList.toggle("hidden", loggedIn);
-  el("appBox").classList.toggle("hidden", !loggedIn);
-  el("btnLogout").disabled = !loggedIn;
-
-  if(loggedIn){
-    el("sessionPill").innerHTML = `Logged in: <b>${session.email}</b>`;
-    renderTable(); recalcTotals();
-    refreshHistory();
-  }else{
-    el("sessionPill").textContent = "Not logged in";
-    el("prodBody").innerHTML = "";
-    el("orderHistory").innerHTML = "";
-  }
-}
-
 async function refreshHistory(){
   try{
     setCheckoutMsg("Loading history from SheetDB…", "warn");
@@ -814,12 +1057,163 @@ async function refreshHistory(){
 }
 
 /* =========================
+   ADMIN UI / ACTIONS
+========================= */
+function setAdminProdMsg(msg, type=""){ el("adminProdMsg").innerHTML = type ? `<span class="${type}">${msg}</span>` : msg; }
+function setAdminRateMsg(msg, type=""){ el("adminRateMsg").innerHTML = type ? `<span class="${type}">${msg}</span>` : msg; }
+
+function adminTabSwitch(which){
+  el("tabProducts").classList.toggle("active", which==="products");
+  el("tabRates").classList.toggle("active", which==="rates");
+  el("panelProducts").classList.toggle("hidden", which!=="products");
+  el("panelRates").classList.toggle("hidden", which!=="rates");
+}
+
+function findProductByName(name){
+  const n = String(name||"").trim().toLowerCase();
+  return products.find(p=> String(p.name||"").trim().toLowerCase()===n) || null;
+}
+
+function buildRateKey(state, role, product){
+  return `${String(state||"").trim()}|${String(role||"").trim()}|${String(product||"").trim()}`;
+}
+
+function refreshRateKey(){
+  const key = buildRateKey(el("r_state").value, el("r_role").value, el("r_product").value);
+  el("r_key").value = key;
+}
+
+async function adminUpsertProduct(){
+  const name = String(el("p_name").value||"").trim();
+  if(!name){ setAdminProdMsg("Product Name is required.", "bad"); return; }
+
+  const existing = await sheetSearch(SHEET_PRODUCTS, "product_name", name).catch(()=>[]);
+  const payload = {
+    product_name: name,
+    strength: String(el("p_strength").value||"").trim(),
+    product_type: String(el("p_type").value||"").trim(),
+    pack: String(el("p_pack").value||"").trim(),
+    category: String(el("p_category").value||"").trim(),
+    class: String(el("p_class").value||"").trim(),
+    therapeutic_indication: String(el("p_indication").value||"").trim(),
+    mrp: String(el("p_mrp").value||"").trim(),
+    hsn: String(el("p_hsn").value||"").trim(),
+    gst_percent: String(el("p_gst").value||"").trim()
+  };
+
+  if(Array.isArray(existing) && existing.length>0){
+    // update by product_name
+    await sheetPatchBy(SHEET_PRODUCTS, "product_name", name, payload);
+    setAdminProdMsg("✅ Product updated in SheetDB.", "ok");
+  }else{
+    // create
+    await sheetPost(SHEET_PRODUCTS, payload);
+    setAdminProdMsg("✅ Product added to SheetDB.", "ok");
+  }
+
+  await reloadProductsAndRates();
+  renderTable(); recalcTotals();
+}
+
+async function adminDeleteProduct(){
+  const name = String(el("p_name").value||"").trim();
+  if(!name){ setAdminProdMsg("Product Name is required.", "bad"); return; }
+  await sheetDeleteBy(SHEET_PRODUCTS, "product_name", name);
+  setAdminProdMsg("✅ Product deleted from SheetDB.", "ok");
+  await reloadProductsAndRates();
+  renderTable(); recalcTotals();
+}
+
+async function adminUpsertRate(){
+  const state = String(el("r_state").value||"").trim();
+  const role = String(el("r_role").value||"").trim();
+  const product = String(el("r_product").value||"").trim();
+  const rate = String(el("r_rate").value||"").trim();
+  const key = buildRateKey(state, role, product);
+  el("r_key").value = key;
+
+  if(!state || !role || !product){ setAdminRateMsg("State, Role, Product are required.", "bad"); return; }
+  if(rate === "" || !isFinite(Number(rate))){ setAdminRateMsg("Valid Rate is required.", "bad"); return; }
+
+  // must have key column in sheet
+  const existing = await sheetSearch(SHEET_RATES, "key", key).catch(()=>[]);
+  const payload = { key, state, role, product_name: product, rate: Number(rate) };
+
+  if(Array.isArray(existing) && existing.length>0){
+    await sheetPatchBy(SHEET_RATES, "key", key, payload);
+    setAdminRateMsg("✅ Rate updated in SheetDB.", "ok");
+  }else{
+    await sheetPost(SHEET_RATES, payload);
+    setAdminRateMsg("✅ Rate added to SheetDB.", "ok");
+  }
+
+  await reloadProductsAndRates();
+  renderTable(); recalcTotals();
+}
+
+async function adminDeleteRate(){
+  const key = String(el("r_key").value||"").trim();
+  if(!key){ setAdminRateMsg("Key is required (fill State/Role/Product).", "bad"); return; }
+  await sheetDeleteBy(SHEET_RATES, "key", key);
+  setAdminRateMsg("✅ Rate deleted from SheetDB.", "ok");
+  await reloadProductsAndRates();
+  renderTable(); recalcTotals();
+}
+
+function fillProductFormFromExisting(){
+  const name = String(el("p_name").value||"").trim();
+  const p = findProductByName(name);
+  if(!p){ setAdminProdMsg("No existing product found with this name.", "warn"); return; }
+  el("p_strength").value = p.strength||"";
+  el("p_type").value = p.type||"";
+  el("p_pack").value = p.pack||"";
+  el("p_category").value = p.category||"";
+  el("p_class").value = p.class||"";
+  el("p_indication").value = p.indication||"";
+  el("p_mrp").value = p.mrp==null ? "" : String(p.mrp);
+  el("p_hsn").value = p.hsn||"";
+  el("p_gst").value = p.gst_percent==null ? "" : String(p.gst_percent);
+  setAdminProdMsg("Filled from existing product.", "ok");
+}
+
+/* =========================
+   SESSION UI
+========================= */
+function syncSessionUI(){
+  const loggedIn = !!session?.email;
+  el("authBox").classList.toggle("hidden", loggedIn);
+  el("appBox").classList.toggle("hidden", !loggedIn);
+  el("btnLogout").disabled = !loggedIn;
+
+  // admin
+  const isAdmin = loggedIn && isAdminEmail(session.email);
+  el("adminGate").classList.toggle("hidden", !isAdmin);
+
+  if(loggedIn){
+    el("sessionPill").innerHTML = `Logged in: <b>${session.email}</b>${isAdmin ? ' <span class="tag">ADMIN</span>' : ''}`;
+    renderTable(); recalcTotals();
+    refreshHistory();
+  }else{
+    el("sessionPill").textContent = "Not logged in";
+    el("prodBody").innerHTML = "";
+    el("orderHistory").innerHTML = "";
+  }
+}
+
+/* =========================
    INIT
 ========================= */
-document.addEventListener("DOMContentLoaded", ()=>{
+document.addEventListener("DOMContentLoaded", async ()=>{
   el("sheetdbTag").textContent = SHEETDB_BASE;
   el("invoiceDate").value = todayISO();
 
+  await reloadProductsAndRates();
+
+  // tabs
+  el("tabProducts").addEventListener("click", ()=>adminTabSwitch("products"));
+  el("tabRates").addEventListener("click", ()=>adminTabSwitch("rates"));
+
+  // auth
   el("btnSignup").addEventListener("click", async ()=>{
     const email = (el("authEmail").value||"").trim().toLowerCase();
     const pass  = (el("authPass").value||"").trim();
@@ -864,7 +1258,11 @@ document.addEventListener("DOMContentLoaded", ()=>{
     setCheckoutMsg("Local cart cleared.", "ok");
   });
 
-  ["search","category","partyState","gstPercent"].forEach(id=>{
+  // reload
+  el("btnReloadFromSheet").addEventListener("click", reloadProductsAndRates);
+
+  // recalc triggers
+  ["search","category","partyState","gstFallback"].forEach(id=>{
     el(id).addEventListener("input", ()=>{ renderTable(); recalcTotals(); });
     el(id).addEventListener("change", ()=>{ renderTable(); recalcTotals(); });
   });
@@ -873,11 +1271,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
     cartQty = {};
     renderTable(); recalcTotals();
     setCheckoutMsg("Quantities reset.", "ok");
-  });
-
-  el("btnLoadDemoRates").addEventListener("click", ()=>{
-    setCheckoutMsg("Sample rates already loaded in code. Edit companyRatesByRole for final rates.", "ok");
-    renderTable(); recalcTotals();
   });
 
   el("btnPreview").addEventListener("click", ()=>{
@@ -900,7 +1293,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
     const err=validateBeforeCheckout();
     if(err){ setCheckoutMsg(err, "bad"); return; }
     const order=buildOrder();
-
     try{
       setCheckoutMsg("Submitting order to SheetDB…", "warn");
       await submitOrderToSheet(order);
@@ -920,6 +1312,36 @@ document.addEventListener("DOMContentLoaded", ()=>{
   });
 
   el("btnRefreshHistory").addEventListener("click", refreshHistory);
+
+  // ADMIN handlers
+  el("btnProdUpsert").addEventListener("click", async ()=>{
+    try{ setAdminProdMsg("Saving product…", "warn"); await adminUpsertProduct(); }
+    catch(e){ setAdminProdMsg("❌ " + (e?.message||e), "bad"); }
+  });
+  el("btnProdDelete").addEventListener("click", async ()=>{
+    try{ setAdminProdMsg("Deleting product…", "warn"); await adminDeleteProduct(); }
+    catch(e){ setAdminProdMsg("❌ " + (e?.message||e), "bad"); }
+  });
+  el("btnProdFillFromSelected").addEventListener("click", fillProductFormFromExisting);
+
+  ["r_state","r_role","r_product"].forEach(id=>{
+    el(id).addEventListener("input", refreshRateKey);
+    el(id).addEventListener("change", refreshRateKey);
+  });
+
+  el("btnRateUpsert").addEventListener("click", async ()=>{
+    try{ setAdminRateMsg("Saving rate…", "warn"); await adminUpsertRate(); }
+    catch(e){ setAdminRateMsg("❌ " + (e?.message||e), "bad"); }
+  });
+  el("btnRateDelete").addEventListener("click", async ()=>{
+    try{ setAdminRateMsg("Deleting rate…", "warn"); await adminDeleteRate(); }
+    catch(e){ setAdminRateMsg("❌ " + (e?.message||e), "bad"); }
+  });
+
+  el("btnAdminReload").addEventListener("click", async ()=>{
+    setAdminProdMsg(""); setAdminRateMsg("");
+    await reloadProductsAndRates();
+  });
 
   syncSessionUI();
 });
