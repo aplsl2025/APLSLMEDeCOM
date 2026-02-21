@@ -78,7 +78,7 @@
     .qty-input{width:76px !important; min-width:76px !important; text-align:center; padding:8px 10px !important;}
     td{vertical-align:top}
     /* Ensure table doesn't shrink columns too much */
-    table{min-width:980px}
+    table{min-width:1080px}
 
   </style>
 
@@ -187,7 +187,10 @@
         <div id="viewStore" class="hide">
           <div class="split">
             <h2>2) Catalog (Role-based Pricing)</h2>
-            <div class="mini">Logged in as: <b id="who"></b></div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <button class="ghost" id="btnSyncProducts" title="Pull latest products from Google Sheet DB">Sync Products</button>
+              <div class="mini">Logged in as: <b id="who"></b></div>
+            </div>
           </div>
 
           <div class="row">
@@ -214,6 +217,7 @@
                   <th>Strength / Composition</th>
                   <th>Pack</th>
                   <th>Type</th>
+                  <th>HSN</th>
                   <th>GST%</th>
                   <th>Price</th>
                   <th style="min-width:90px">Qty</th>
@@ -277,6 +281,9 @@
               </select>
             </div>
             <div>
+              <label>HSN</label><input id="pHsn" type="text" placeholder="e.g., 3004">
+            </div>
+            <div>
               <label>GST %</label><input id="pGst" type="number" min="0" step="0.01" placeholder="12">
             </div>
           </div>
@@ -309,7 +316,7 @@
             <table>
               <thead>
                 <tr>
-                  <th>ID</th><th>Brand</th><th>Company</th><th>Price</th><th>Status</th>
+                  <th>ID</th><th>Brand</th><th>Company</th><th>HSN</th><th>Price</th><th>Status</th>
                 </tr>
               </thead>
               <tbody id="adminRows"></tbody>
@@ -509,11 +516,11 @@
   // SEED PRODUCTS (edit as needed)
   // =============================
   const SEED_PRODUCTS = [
-    { id:"P1", brand:"AZIN-500", company:"Ahanitya Pharma Life Science LLP", strength:"Azithromycin Tablets I.P 500 mg", pack:"10x10", type:"TAB", gst:12, basePrice:140, status:"available" },
-    { id:"P2", brand:"ASP", company:"Ahanitya Pharma Life Science LLP", strength:"Aceclofenac + Paracetamol + Serratiopeptidase", pack:"10x10", type:"TAB", gst:12, basePrice:140, status:"available" },
-    { id:"P3", brand:"A-SUNAC", company:"Ahanitya Pharma Life Science LLP", strength:"Aceclofenac + Paracetamol", pack:"10x10", type:"TAB", gst:12, basePrice:135, status:"available" },
-    { id:"P4", brand:"PANTO-DSR", company:"Ahanitya Pharma Life Science LLP", strength:"Pantoprazole 40 mg + Domperidone 30 mg", pack:"10x10", type:"CAP", gst:12, basePrice:140, status:"soon" },
-    { id:"P5", brand:"LE-MONT", company:"Ahanitya Pharma Life Science LLP", strength:"Montelukast + Levocetirizine", pack:"10x10", type:"TAB", gst:12, basePrice:120, status:"available" }
+    { id:"P1", brand:"AZIN-500", company:"Ahanitya Pharma Life Science LLP", strength:"Azithromycin Tablets I.P 500 mg", pack:"10x10", type:"TAB", hsn:"", gst:12, basePrice:140, status:"available" },
+    { id:"P2", brand:"ASP", company:"Ahanitya Pharma Life Science LLP", strength:"Aceclofenac + Paracetamol + Serratiopeptidase", pack:"10x10", type:"TAB", hsn:"", gst:12, basePrice:140, status:"available" },
+    { id:"P3", brand:"A-SUNAC", company:"Ahanitya Pharma Life Science LLP", strength:"Aceclofenac + Paracetamol", pack:"10x10", type:"TAB", hsn:"", gst:12, basePrice:135, status:"available" },
+    { id:"P4", brand:"PANTO-DSR", company:"Ahanitya Pharma Life Science LLP", strength:"Pantoprazole 40 mg + Domperidone 30 mg", pack:"10x10", type:"CAP", hsn:"", gst:12, basePrice:140, status:"soon" },
+    { id:"P5", brand:"LE-MONT", company:"Ahanitya Pharma Life Science LLP", strength:"Montelukast + Levocetirizine", pack:"10x10", type:"TAB", hsn:"", gst:12, basePrice:120, status:"available" }
   ];
 
   // =============================
@@ -686,7 +693,7 @@
   // =============================
   function productMatches(p, q){
     if(!q) return true;
-    const s = (p.brand+" "+p.company+" "+p.strength).toLowerCase();
+    const s = (p.brand+" "+p.company+" "+p.strength+" "+(p.hsn||"")).toLowerCase();
     return s.includes(q.toLowerCase());
   }
 
@@ -719,6 +726,7 @@
         <td>${p.strength}</td>
         <td>${p.pack}</td>
         <td>${p.type}</td>
+        <td>${p.hsn || ""}</td>
         <td>${p.gst}%</td>
         <td>
           <div class="price">INR ${money(pr.net)} + GST</div>
@@ -816,7 +824,7 @@
       const lineTotal = taxable + gstAmt;
       total += lineTotal;
 
-      lines.push(`${idx+1}. ${p.brand} (${p.type}) - ${p.strength} | Pack ${p.pack} | Qty ${ci.qty} | Rate INR ${money(pr.net)} | Taxable INR ${money(taxable)} | GST ${p.gst||0}% (INR ${money(gstAmt)}) | Total INR ${money(lineTotal)}`);
+      lines.push(`${idx+1}. ${p.brand} (${p.type}) - ${p.strength} | Pack ${p.pack} | HSN ${p.hsn||"-"} | Qty ${ci.qty} | Rate INR ${money(pr.net)} | Taxable INR ${money(taxable)} | GST ${p.gst||0}% (INR ${money(gstAmt)}) | Total INR ${money(lineTotal)}`);
     });
 
     lines.push(``);
@@ -975,6 +983,24 @@
     const url = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");
 
+    // optional: log order to Google Sheet
+    const built = buildOrderText();
+    pushOrderToGoogleSheet({
+      orderId: built.orderId,
+      createdAt: new Date().toISOString(),
+      buyer: s.bizName,
+      role: s.role,
+      mobile: s.mobile,
+      state: s.city,
+      area: s.area || "",
+      address: s.address || "",
+      subtotal: Number(document.getElementById("subTotal")?.textContent || 0),
+      gst: Number(document.getElementById("gstTotal")?.textContent || 0),
+      total: Number(document.getElementById("grandTotal")?.textContent || 0),
+      note: (document.getElementById("poNote")?.value || "").trim(),
+      orderText: built.text
+    });
+
     setMsg($("orderMsg"),"Opened WhatsApp with order message.", "ok");
   }
 
@@ -983,9 +1009,27 @@
     if(!s) return;
 
     const toEmail = $("toEmail").value.trim() || SETTINGS.DEFAULT_EMAIL;
-    const { text } = buildOrderText();
+    const built = buildOrderText();
+    const text = built.text;
 
     $("orderTextField").value = text;
+
+    // optional: log order to Google Sheet
+    pushOrderToGoogleSheet({
+      orderId: built.orderId,
+      createdAt: new Date().toISOString(),
+      buyer: s.bizName,
+      role: s.role,
+      mobile: s.mobile,
+      state: s.city,
+      area: s.area || "",
+      address: s.address || "",
+      subtotal: Number(document.getElementById("subTotal")?.textContent || 0),
+      gst: Number(document.getElementById("gstTotal")?.textContent || 0),
+      total: Number(document.getElementById("grandTotal")?.textContent || 0),
+      note: (document.getElementById("poNote")?.value || "").trim(),
+      orderText: text
+    });
 
     const form = $("emailForm");
     form.action = `https://formsubmit.co/${encodeURIComponent(toEmail)}`;
@@ -1013,6 +1057,7 @@
         <td>${p.id}</td>
         <td>${p.brand}</td>
         <td>${p.company}</td>
+        <td>${p.hsn || ""}</td>
         <td>INR ${money(p.basePrice)}</td>
         <td>${p.status==="available" ? "Available" : "Coming Soon"}</td>
       `;
@@ -1030,6 +1075,7 @@
     $("pCompany").value = p.company;
     $("pStrength").value = p.strength;
     $("pPack").value = p.pack;
+    if(document.getElementById("pHsn")) $("pHsn").value = p.hsn || "";
     $("pType").value = p.type;
     $("pGst").value = p.gst;
     $("pPrice").value = p.basePrice;
@@ -1056,6 +1102,7 @@
     const strength = $("pStrength").value.trim();
     const pack = $("pPack").value.trim();
     const type = $("pType").value;
+    const hsn = (document.getElementById("pHsn") ? $("pHsn").value.trim() : "");
     const gst = Number($("pGst").value || 0);
     const basePrice = Number($("pPrice").value || 0);
     const status = $("pStatus").value;
@@ -1065,7 +1112,7 @@
 
     const products = load(K_PRODUCTS, []);
     const existing = products.find(p=>p.id===id);
-    const obj = { id, brand, company, strength, pack, type, gst, basePrice, status };
+    const obj = { id, brand, company, strength, pack, type, hsn, gst, basePrice, status };
 
     if(existing){
       Object.assign(existing, obj);
@@ -1130,6 +1177,7 @@
         String(idx+1),
         p.brand,
         p.type,
+        (p.hsn||""),
         p.pack || "",
         String(ci.qty),
         money(pr.net),
@@ -1183,7 +1231,7 @@
       doc.autoTable({
         startY,
         head: [[
-          "Sr", "Brand", "Type", "Pack", "Qty", "Rate", "Taxable", "GST%", "GST Amt", "Total"
+          "Sr", "Brand", "Type", "HSN", "Pack", "Qty", "Rate", "Taxable", "GST%", "GST Amt", "Total"
         ]],
         body: rows,
         styles: { fontSize: 8 },
@@ -1226,10 +1274,137 @@
 
 
   // =============================
+  // GOOGLE SHEET DB SYNC (Products + Orders) - OPTIONAL
+  // =============================
+  // Option A (Recommended no-code): SheetDB
+  //   1) Create a Google Sheet with tabs: products, orders (optional), users (optional)
+  //   2) Connect SheetDB and get your API base URL like: https://sheetdb.io/api/v1/xxxxxx
+  //   3) Put that URL below and set MODE="sheetdb"
+  //
+  // Option B: Google Apps Script Web App
+  //   Deploy a Web App that returns JSON for products and accepts POST for orders.
+  //   Then set MODE="appscript" and paste your web app URL.
+  //
+  const GSHEET = {
+    MODE: "sheetdb", // "sheetdb" or "appscript" or "off"
+    SHEETDB_BASE: "https://sheetdb.io/api/v1/oq0xux451r2tn", // e.g., "https://sheetdb.io/api/v1/oq0xux451r2tn"
+    APPSCRIPT_URL: "", // e.g., "https://script.google.com/macros/s/XXXX/exec"
+    PRODUCTS_SHEET: "products",
+    ORDERS_SHEET: "orders"
+  };
+
+  function normalizeProductRow(r){
+    // Map common column names from Google Sheet -> app fields
+    // Expected columns (recommended):
+    // id, brand, company, strength, pack, type, hsn, gst, basePrice, status
+    const get = (k, alt=[])=>{
+      if(r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== "") return r[k];
+      for(const a of alt){
+        if(r[a] !== undefined && r[a] !== null && String(r[a]).trim() !== "") return r[a];
+      }
+      return "";
+    };
+    return {
+      id: String(get("id", ["ID","Id","productId","Product ID"])).trim() || ("P" + Math.floor(Math.random()*90000+10000)),
+      brand: String(get("brand", ["Brand","Brand Name"])).trim(),
+      company: String(get("company", ["Company","Company Name"])).trim(),
+      strength: String(get("strength", ["Strength","Composition","Molecule"])).trim(),
+      pack: String(get("pack", ["Pack","Packing"])).trim(),
+      type: String(get("type", ["Type","Product Type"])).trim() || "TAB",
+      hsn: String(get("hsn", ["HSN","hsn_code","HSN Code"])).trim(),
+      gst: Number(get("gst", ["GST","gst%","GST%","GST Percent"]) || 0),
+      basePrice: Number(get("basePrice", ["BasePrice","price","Price","PTR","PTS"]) || 0),
+      status: (String(get("status", ["Status","availability","Available"]) || "available").toLowerCase().includes("soon")) ? "soon" : "available"
+    };
+  }
+
+  async function syncProductsFromGoogleSheet(showToast=true){
+    if(GSHEET.MODE === "off") return false;
+
+    try{
+      let data = null;
+
+      if(GSHEET.MODE === "sheetdb"){
+        const base = (GSHEET.SHEETDB_BASE || "").trim();
+        if(!base || base.includes("PASTE_")) throw new Error("SheetDB base URL not set.");
+        const url = `${base}/${encodeURIComponent(GSHEET.PRODUCTS_SHEET)}`;
+        const res = await fetch(url, { method:"GET" });
+        if(!res.ok) throw new Error("SheetDB GET failed: " + res.status);
+        data = await res.json(); // array
+      } else if(GSHEET.MODE === "appscript"){
+        const u = (GSHEET.APPSCRIPT_URL || "").trim();
+        if(!u || u.includes("PASTE_")) throw new Error("Apps Script URL not set.");
+        const res = await fetch(`${u}?action=products`, { method:"GET" });
+        if(!res.ok) throw new Error("Apps Script GET failed: " + res.status);
+        const j = await res.json();
+        data = Array.isArray(j) ? j : (j.products || []);
+      }
+
+      if(!Array.isArray(data)) throw new Error("Products payload is not an array.");
+      const mapped = data.map(normalizeProductRow).filter(p=>p.brand);
+      if(mapped.length === 0) throw new Error("No products found in sheet.");
+
+      save(K_PRODUCTS, mapped);
+      if(getSession() && !getSession().isAdmin){
+        renderProducts();
+        renderCart();
+      }
+      if(getSession() && getSession().isAdmin){
+        renderAdmin();
+      }
+      if(showToast && document.getElementById("orderMsg")){
+        setMsg($("orderMsg"), "Synced products from Google Sheet DB.", "ok");
+        setTimeout(()=>hideMsg($("orderMsg")), 1200);
+      }
+      return true;
+    }catch(e){
+      console.warn("Sheet sync failed:", e);
+      if(showToast && document.getElementById("orderMsg")){
+        setMsg($("orderMsg"), "Google Sheet sync failed. Using local products. ("+ (e.message||e) +")", "bad");
+        setTimeout(()=>hideMsg($("orderMsg")), 2500);
+      }
+      return false;
+    }
+  }
+
+  async function pushOrderToGoogleSheet(orderObj){
+    // Best-effort logging of orders to Sheet (optional).
+    // For SheetDB: POST to /orders
+    // For Apps Script: POST with action=order
+    if(GSHEET.MODE === "off") return;
+
+    try{
+      if(GSHEET.MODE === "sheetdb"){
+        const base = (GSHEET.SHEETDB_BASE || "").trim();
+        if(!base || base.includes("PASTE_")) return;
+        const url = `${base}/${encodeURIComponent(GSHEET.ORDERS_SHEET)}`;
+        await fetch(url, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ data: [orderObj] })
+        });
+      } else if(GSHEET.MODE === "appscript"){
+        const u = (GSHEET.APPSCRIPT_URL || "").trim();
+        if(!u || u.includes("PASTE_")) return;
+        await fetch(u, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ action:"order", data: orderObj })
+        });
+      }
+    }catch(e){
+      console.warn("Order push failed:", e);
+    }
+  }
+
+  // =============================
   // EVENTS
   // =============================
   window.addEventListener("load", ()=>{
     initStorage();
+
+    // Try syncing products from Google Sheet DB (best-effort)
+    syncProductsFromGoogleSheet(false);
 
     // Populate areas for selected state
     const stateSel = document.getElementById("city");
@@ -1257,6 +1432,9 @@
       alert("Cleared! The page will reload.");
       location.reload();
     });
+
+    const syncBtn = document.getElementById("btnSyncProducts");
+    if(syncBtn){ syncBtn.addEventListener("click", ()=>syncProductsFromGoogleSheet(true)); }
 
     $("search").addEventListener("input", renderProducts);
     $("availability").addEventListener("change", renderProducts);
