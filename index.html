@@ -794,7 +794,9 @@
     const baseType = currentBaseType();
     const discounts = currentDiscounts();
     const po = $("poNote").value.trim();
-    const orderId = nowId();
+    let lastInv = Number(localStorage.getItem("lastInvoiceNo") || 1000);
+lastInv++;localStorage.setItem("lastInvoiceNo", lastInv);
+const orderId = "APLSL-INV-" + lastInv;
 
     let lines = [];
     lines.push(`APLSL B2B Medicine Order`);
