@@ -1,1465 +1,928 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>B2B Medicines Store</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>APLSL B2B Order Portal (SheetDB Login + Orders + GST + PDF)</title>
+
+  <!-- jsPDF + AutoTable (PDF bill) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+
   <style>
     :root{
-      --bg:#f4f6f9;
-      --card:#ffffff;
-      --text:#101828;
-      --muted:#667085;
-      --brand:#11799A;
-      --brand2:#39BEE5;
-      --danger:#b42318;
-      --ok:#067647;
-      --border:#e4e7ec;
+      --bg:#0b1220; --card:#0f1b33; --text:#eaf0ff; --muted:#a7b7e6;
+      --line:rgba(255,255,255,.10); --good:#23c483; --warn:#ffb020; --bad:#ff5d5d;
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:Inter,system-ui,Segoe UI,Arial;background:var(--bg);color:var(--text)}
-    .wrap{max-width:1100px;margin:auto;padding:18px}
+    body{
+      margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1200px 800px at 20% 0%, rgba(57,190,229,.18), transparent 60%),
+                  radial-gradient(900px 700px at 100% 20%, rgba(17,121,154,.20), transparent 55%),
+                  var(--bg);
+      color:var(--text);
+    }
+    .wrap{max-width:1200px;margin:0 auto;padding:18px}
     .topbar{
-      background:linear-gradient(90deg,var(--brand),var(--brand2));
-      color:#fff;border-radius:16px;padding:16px 18px;
-      display:flex;align-items:center;justify-content:space-between;gap:12px;
-      box-shadow:0 8px 24px rgba(16,24,40,.12);
+      display:flex;gap:12px;align-items:center;justify-content:space-between;
+      padding:14px 16px;border:1px solid var(--line);background:rgba(15,27,51,.75);
+      border-radius:16px;backdrop-filter: blur(8px);
     }
-    .topbar h1{margin:0;font-size:18px;letter-spacing:.2px}
-    .pill{background:rgba(255,255,255,.18);padding:6px 10px;border-radius:999px;font-size:12px}
-    .grid{display:grid;gap:14px;margin-top:14px}
-    .grid-2{grid-template-columns:1.2fr .8fr}
-    @media(max-width:960px){.grid-2{grid-template-columns:1fr}}
-    .card{
-      background:var(--card);border:1px solid var(--border);border-radius:16px;
-      padding:14px;box-shadow:0 6px 18px rgba(16,24,40,.06);
-    }
-    .card h2{margin:0 0 10px 0;font-size:15px}
-    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
-    input,select,textarea{
-      width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);
-      outline:none;font-size:14px;background:#fff;
-    }
-    textarea{min-height:88px;resize:vertical}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .row > *{flex:1;min-width:210px}
-    .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:42px;height:42px;border-radius:12px;background: linear-gradient(135deg, rgba(57,190,229,.9), rgba(17,121,154,.95));}
+    .brand h1{font-size:16px;margin:0}
+    .brand p{margin:2px 0 0;color:var(--muted);font-size:12px}
+    .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .pill{padding:7px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12px;background:rgba(255,255,255,.04)}
     button{
-      border:0;border-radius:12px;padding:10px 12px;font-weight:600;
-      cursor:pointer;font-size:14px;
+      cursor:pointer;border:0;border-radius:12px;padding:10px 12px;
+      background: linear-gradient(135deg, rgba(57,190,229,.9), rgba(17,121,154,.95));
+      color:white;font-weight:700;
     }
-    .btn{background:var(--brand);color:#fff}
-    .btn:hover{filter:brightness(.95)}
-    .btn2{background:#0b5e7a;color:#fff}
-    .ghost{background:#fff;border:1px solid var(--border);color:var(--text)}
-    .danger{background:var(--danger);color:#fff}
-    .ok{background:var(--ok);color:#fff}
-    .note{font-size:12px;color:var(--muted);line-height:1.5}
-    .msg{padding:10px 12px;border-radius:12px;border:1px dashed var(--border);background:#fbfcfe;font-size:13px}
-    .msg.ok{border-color:#b7e4c7;background:#ecfdf3;color:#05603a}
-    .msg.bad{border-color:#f5b7b1;background:#fff1f0;color:#7a271a}
-    table{width:100%;border-collapse:separate;border-spacing:0 10px}
-    th{font-size:12px;text-align:left;color:var(--muted);padding:0 10px}
-    td{background:#fff;border:1px solid var(--border);padding:10px;border-left:0;border-right:0}
-    tr td:first-child{border-left:1px solid var(--border);border-radius:12px 0 0 12px}
-    tr td:last-child{border-right:1px solid var(--border);border-radius:0 12px 12px 0}
-    .mini{font-size:12px;color:var(--muted)}
-    .price{font-weight:700}
-    .tag{display:inline-block;font-size:11px;padding:4px 8px;border-radius:999px;background:#eef4ff;color:#3538cd}
-    .tag.off{background:#f2f4f7;color:#344054}
-    .tag.soon{background:#fffaeb;color:#b54708}
-    .split{display:flex;align-items:center;justify-content:space-between;gap:10px}
-    .hide{display:none !important}
-    .kbd{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f2f4f7;border:1px solid var(--border);padding:2px 6px;border-radius:8px}
-    .footer{margin:14px 0 0 0;text-align:center;color:var(--muted);font-size:12px}
-    a{color:inherit}
-  
-    /* Improve quantity visibility */
-    .qty-input{width:76px !important; min-width:76px !important; text-align:center; padding:8px 10px !important;}
-    td{vertical-align:top}
-    /* Ensure table doesn't shrink columns too much */
-    table{min-width:1080px}
-
+    button.secondary{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text);font-weight:600}
+    button.danger{background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.35);color:#ffd1d1;font-weight:700}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .grid{margin-top:14px;display:grid;grid-template-columns:380px 1fr;gap:14px}
+    @media (max-width: 980px){.grid{grid-template-columns:1fr}}
+    .card{border:1px solid var(--line);background:rgba(15,27,51,.68);border-radius:16px;padding:14px;backdrop-filter: blur(8px)}
+    .card h2{margin:0 0 10px;font-size:14px}
+    .muted{color:var(--muted);font-size:12px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .row1{display:grid;grid-template-columns:1fr;gap:10px}
+    label{display:block;font-size:12px;color:var(--muted);margin:0 0 6px}
+    input, select, textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--text);padding:10px;border-radius:12px;outline:none}
+    textarea{min-height:80px;resize:vertical}
+    .hint{font-size:11px;color:var(--muted);margin-top:6px}
+    .ok{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+    .sep{height:1px;background:var(--line);margin:12px 0}
+    table{width:100%;border-collapse:collapse}
+    th, td{border-bottom:1px solid var(--line);padding:10px 8px;font-size:12px;vertical-align:top}
+    th{color:var(--muted);font-weight:700;text-align:left}
+    .tag{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--muted);font-size:11px}
+    .qtyBox{display:flex;gap:6px;align-items:center}
+    .qtyBtn{width:30px;height:30px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text);font-weight:800;padding:0}
+    .qtyInput{width:62px;text-align:center;padding:8px}
+    .right{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+    .totals{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .kpi{border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:14px;padding:10px}
+    .kpi .v{font-size:16px;font-weight:800;margin-top:4px}
+    .smallbtn{padding:8px 10px;border-radius:12px;font-size:12px}
+    .hidden{display:none !important}
   </style>
-
-  <!-- PDF Invoice Generation -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-
 </head>
+
 <body>
-  <div class="wrap">
-    <div class="topbar">
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo"></div>
       <div>
-        <h1>APLSL B2B Medicines Store</h1>
-        <div class="mini">Login • Role-based Pricing • Cart • WhatsApp + Email Order</div>
+        <h1>APLSL B2B Medicine Order Portal</h1>
+        <p>Login (SheetDB) → Select Category → Add Qty → GST → PDF → Save Order to SheetDB → WhatsApp</p>
       </div>
-      <div class="pill" id="pillStatus">Not logged in</div>
     </div>
-
-    <div class="grid grid-2">
-      <!-- LEFT: Main -->
-      <div class="card" id="cardMain">
-        <!-- AUTH -->
-        <div id="viewAuth">
-          <h2>1) Login / Signup (B2B)</h2>
-          <div class="note">
-            This is a ready-to-upload single-file demo portal. Users are stored in <span class="kbd">localStorage</span> (browser).
-            For production, connect backend (Firebase/Supabase/Node). For now you can launch quickly and collect orders.
-          </div>
-
-          <div class="row">
-            <div>
-              <label>Business Type (Role)</label>
-              <select id="role">
-                <option value="retailer">Retailer</option>
-                <option value="wholesaler">Wholesaler</option>
-                <option value="doctor">Doctor/Clinic</option>
-                <option value="hospital">Hospital</option>
-                <option value="stockist">Stockist</option>
-                <option value="partner">Sales Partner</option>
-              </select>
-            </div>
-            <div>
-              <label>Mobile Number</label>
-              <input id="mobile" type="tel" placeholder="e.g., 98487090212" />
-            </div>
-            <div>
-              <label>Password</label>
-              <input id="password" type="password" placeholder="Create or enter password" />
-            </div>
-          </div>
-
-          <div class="row">
-            <div>
-              <label>Business / Shop Name</label>
-              <input id="bizName" type="text" placeholder="e.g., ABC Medical Store" />
-            </div>
-            <div>
-              <label>GSTIN</label>
-              <input id="gstin" type="text" placeholder="15-character GSTIN (optional in demo)" />
-            </div>
-            <div>
-              <label>Drug License No.</label>
-              <input id="dlno" type="text" placeholder="DL No. (optional in demo)" />
-            </div>
-          </div>
-
-          <div class="row">
-            <div>
-              <label>Delivery State</label>
-              <select id="city">
-                <option value="Gujarat">Gujarat (Active)</option>
-                <option value="Rajasthan">Rajasthan (Inactive)</option>
-                <option value="Madhya Pradesh">Madhya Pradesh (Inactive)</option>
-                <option value="Uttar Pradesh">Uttar Pradesh (Inactive)</option>
-                <option value="Maharashtra">Maharashtra (Inactive)</option>
-                <option value="Other">Other State (Inactive)</option>
-              </select>
-              <div class="mini">Currently active state: Gujarat only. Other states visible but ordering restricted.</div>
-            </div>
-            <div>
-              <label>Delivery Area</label>
-              <select id="area"><option value="">Select area</option></select>
-            </div>
-            <div>
-              <label>Full Address (Flat/Street/Landmark)</label>
-              <input id="address" type="text" placeholder="Enter full address for delivery" />
-            </div>
-          </div>
-
-          <div class="btnrow">
-            <button class="btn" id="btnSignup">Create Account</button>
-            <button class="btn2" id="btnLogin">Login</button>
-            <button class="ghost" id="btnAdminLogin">Admin Login</button>
-                      <button class="ghost" id="btnResetAll">Reset / Clear All Data</button>
-          </div>
-
-          <div class="msg hide" id="authMsg"></div>
-
-          <hr style="border:0;border-top:1px solid var(--border);margin:14px 0">
-          <div class="note">
-            Admin default PIN: <span class="kbd">2580</span> (change inside code in settings).
-          </div>
-        </div>
-
-        <!-- STORE -->
-        <div id="viewStore" class="hide">
-          <div class="split">
-            <h2>2) Catalog (Role-based Pricing)</h2>
-            <div style="display:flex;align-items:center;gap:10px">
-              <button class="ghost" id="btnSyncProducts" title="Pull latest products from Google Sheet DB">Sync Products</button>
-              <div class="mini">Logged in as: <b id="who"></b></div>
-            </div>
-          </div>
-
-          <div class="row">
-            <div>
-              <label>Search (Brand / Company / Molecule)</label>
-              <input id="search" type="text" placeholder="Type to filter... e.g., AZIN or Ahanitya or Azithromycin" />
-            </div>
-            <div>
-              <label>Filter: Availability</label>
-              <select id="availability">
-                <option value="all">All</option>
-                <option value="available">Available</option>
-                <option value="soon">Coming Soon</option>
-              </select>
-            </div>
-          </div>
-
-          <div style="margin-top:10px; overflow:auto; max-height:420px; border-radius:14px; border:1px solid var(--border); padding:10px; background:#fcfdff">
-            <table>
-              <thead>
-                <tr>
-                  <th>Brand</th>
-                  <th>Company</th>
-                  <th>Strength / Composition</th>
-                  <th>Pack</th>
-                  <th>Type</th>
-                  <th>HSN</th>
-                  <th>GST%</th>
-                  <th>Price</th>
-                  <th style="min-width:90px">Qty</th>
-                  <th>Add</th>
-                </tr>
-              </thead>
-              <tbody id="productRows"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- ADMIN -->
-        <div id="viewAdmin" class="hide">
-          <div class="split">
-            <h2>Admin Panel</h2>
-            <div class="mini">Only for you</div>
-          </div>
-
-          <div class="msg">
-            In this demo, admin edits are saved in your browser only. For production, connect to DB.
-          </div>
-
-          <h3 style="margin:12px 0 6px;font-size:14px">Pricing Settings</h3>
-          <div class="row">
-            <div>
-              <label>Base Price Type</label>
-              <select id="basePriceType">
-                <option value="PTR">PTR (Retailer price)</option>
-                <option value="PTS">PTS (Stockist/Wholesaler)</option>
-                <option value="INST">Institutional</option>
-              </select>
-            </div>
-            <div>
-              <label>Role Discounts (%)</label>
-              <input id="discountJson" type="text" placeholder='{"retailer":0,"wholesaler":3,"doctor":5,"hospital":7,"stockist":2,"partner":0}' />
-              <div class="mini">Edit JSON discounts per role</div>
-            </div>
-          </div>
-
-          <h3 style="margin:12px 0 6px;font-size:14px">Add / Edit Product</h3>
-          <div class="row">
-            <div>
-              <label>Brand</label><input id="pBrand" type="text" placeholder="AZIN-500">
-            </div>
-            <div>
-              <label>Company</label><input id="pCompany" type="text" placeholder="Ahanitya Pharma Life Science LLP">
-            </div>
-            <div>
-              <label>Strength / Composition</label><input id="pStrength" type="text" placeholder="Azithromycin Tablets I.P 500 mg">
-            </div>
-          </div>
-          <div class="row">
-            <div>
-              <label>Pack</label><input id="pPack" type="text" placeholder="10x10">
-            </div>
-            <div>
-              <label>Type</label>
-              <select id="pType">
-                <option value="TAB">TAB</option><option value="CAP">CAP</option><option value="SYP">SYP</option>
-                <option value="INJ">INJ</option><option value="GEL">GEL</option><option value="CRM">CRM</option>
-              </select>
-            </div>
-            <div>
-              <label>HSN</label><input id="pHsn" type="text" placeholder="e.g., 3004">
-            </div>
-            <div>
-              <label>GST %</label><input id="pGst" type="number" min="0" step="0.01" placeholder="12">
-            </div>
-          </div>
-          <div class="row">
-            <div>
-              <label>Base Price (INR)</label><input id="pPrice" type="number" min="0" step="0.01" placeholder="140">
-            </div>
-            <div>
-              <label>Status</label>
-              <select id="pStatus">
-                <option value="available">Available</option>
-                <option value="soon">Coming Soon</option>
-              </select>
-            </div>
-            <div>
-              <label>Product ID (auto if blank)</label><input id="pId" type="text" placeholder="leave blank to auto-generate">
-            </div>
-          </div>
-          <div class="btnrow">
-            <button class="btn" id="btnSaveProduct">Save Product</button>
-            <button class="danger" id="btnDeleteProduct">Delete Product</button>
-            <button class="ghost" id="btnAdminBack">Back to Store</button>
-            <button class="ghost" id="btnAdminLogout">Logout</button>
-          </div>
-
-          <hr style="border:0;border-top:1px solid var(--border);margin:14px 0">
-          <h3 style="margin:0 0 6px;font-size:14px">All Products</h3>
-          <div class="note">Click a product row to load it into the editor.</div>
-          <div style="margin-top:10px; overflow:auto; max-height:320px; border-radius:14px; border:1px solid var(--border); padding:10px; background:#fcfdff">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th><th>Brand</th><th>Company</th><th>HSN</th><th>Price</th><th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="adminRows"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- RIGHT: Cart / Checkout -->
-      <div class="card" id="cardCart">
-        <div id="viewCartLocked">
-          <h2>Cart</h2>
-          <div class="msg">Login to start adding products.</div>
-        </div>
-
-        <div id="viewCart" class="hide">
-          <div class="split">
-            <h2>3) Cart & Checkout</h2>
-            <span class="tag" id="roleTag">role</span>
-          </div>
-
-          <div id="cartList" class="note" style="margin-top:10px">Your cart is empty.</div>
-
-          
-          <div style="margin-top:10px" class="msg">
-            <div class="split">
-              <div><b>Subtotal (Taxable Value)</b></div>
-              <div style="font-weight:800">INR <span id="subTotal">0.00</span></div>
-            </div>
-            <div class="split" style="margin-top:6px">
-              <div><b>Total GST</b></div>
-              <div style="font-weight:800">INR <span id="gstTotal">0.00</span></div>
-            </div>
-
-            <div id="gstSplitBox" style="margin-top:8px; border-top:1px dashed var(--border); padding-top:8px">
-              <div class="split">
-                <div class="mini">CGST</div>
-                <div class="mini">INR <b id="cgstAmt">0.00</b></div>
-              </div>
-              <div class="split" style="margin-top:4px">
-                <div class="mini">SGST</div>
-                <div class="mini">INR <b id="sgstAmt">0.00</b></div>
-              </div>
-              <div class="split hide" id="igstRow" style="margin-top:4px">
-                <div class="mini">IGST</div>
-                <div class="mini">INR <b id="igstAmt">0.00</b></div>
-              </div>
-            </div>
-
-            <div style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px" class="split">
-              <div style="font-size:14px"><b>Grand Total</b></div>
-              <div style="font-size:20px;font-weight:900">INR <span id="grandTotal">0.00</span></div>
-            </div>
-
-            <div class="mini" style="margin-top:6px">
-              Tax split: Gujarat = CGST + SGST. Other states = IGST (auto when activated).
-            </div>
-          </div>
-
-          <div class="btnrow">
-            <button class="ghost" id="btnPdf">Generate GST Invoice PDF</button>
-          </div>
-
-
-          <label>Purchase Order Note (optional)</label>
-          <textarea id="poNote" placeholder="Any notes: preferred delivery time, payment terms, urgent, etc."></textarea>
-
-          <label>Send Order To</label>
-          <div class="row">
-            <div>
-              <label style="margin-top:0">WhatsApp Number</label>
-              <input id="waNumber" type="tel" placeholder="+918487090212" />
-              <div class="mini">Use country code (e.g., +91)</div>
-            </div>
-            <div>
-              <label style="margin-top:0">Email (FormSubmit)</label>
-              <input id="toEmail" type="email" placeholder="infoahanityapharmalifescellp@gmail.com" />
-              <div class="mini">Uses FormSubmit (no server) in this demo</div>
-            </div>
-          </div>
-
-          <div class="btnrow">
-            <button class="ghost" id="btnLogout">Logout</button>
-            <button class="ok" id="btnWhatsApp">Send on WhatsApp</button>
-            <button class="btn2" id="btnEmail">Send on Email</button>
-            <button class="ghost" id="btnClearCart">Clear Cart</button>
-          </div>
-
-          <div class="msg hide" id="orderMsg"></div>
-
-          <!-- Hidden FormSubmit form -->
-          <form id="emailForm" class="hide" method="POST" enctype="multipart/form-data" target="_blank">
-            <input type="hidden" name="_subject" value="New B2B Medicine Order - APLSL Demo Portal">
-            <input type="hidden" name="_captcha" value="false">
-            <input type="hidden" name="_template" value="table">
-            <input type="hidden" name="order_text" id="orderTextField">
-          </form>
-        </div>
-
-        <div class="footer">
-          B2B Medicines Store - Ready to upload on GitHub Pages.
-        </div>
-      </div>
+    <div class="actions">
+      <div class="pill" id="sessionPill">Not logged in</div>
+      <button class="secondary smallbtn" id="btnLogout" disabled>Logout</button>
+      <button class="danger smallbtn" id="btnClearLocal" title="Clears local session/cart only">Clear Local</button>
     </div>
   </div>
 
-<script>
-  // =============================
-  // SETTINGS (edit these)
-  // =============================
-  const SETTINGS = {
-    ADMIN_PIN: "2580",
-    SERVICE_CITY_ONLY: "Gujarat",         // enforce city restriction
-    DEFAULT_WA: "+918487090212",
-    DEFAULT_EMAIL: "infoahanityapharmalifescellp@gmail.com",
-    DEFAULT_DISCOUNTS: { retailer:0, wholesaler:3, doctor:5, hospital:7, stockist:2, partner:0 },
-    BASE_PRICE_TYPE: "PTR" // PTR/PTS/INST label (demo only)
-  };
-  // =============================
-  // AREAS BY STATE (edit as needed)
-  // =============================
-  const AREAS_BY_STATE = {
-    "Gujarat": [
-      "Ahmedabad - Bopal","Ahmedabad - Shela","Ahmedabad - Prahlad Nagar","Ahmedabad - Satellite",
-      "Ahmedabad - Thaltej","Ahmedabad - Vastrapur","Ahmedabad - Maninagar","Ahmedabad - Naranpura",
-      "Ahmedabad - Navrangpura","Ahmedabad - Paldi","Ahmedabad - Gota","Ahmedabad - Chandkheda",
-      "Ahmedabad - South Bopal","Ahmedabad - Nikol","Ahmedabad - Vejalpur","Ahmedabad - SG Highway",
-      "Surat - Adajan","Surat - Vesu","Surat - Varachha","Surat - Katargam",
-      "Vadodara - Alkapuri","Vadodara - Manjalpur","Vadodara - Gotri","Vadodara - Waghodia Road",
-      "Rajkot - Kalavad Road","Rajkot - Raiya Road","Rajkot - 150ft Ring Road",
-      "Bhavnagar - Ghogha Road","Jamnagar - Patel Colony","Gandhinagar - Infocity"
-    ],
-    "Rajasthan": [
-      "Jaipur - Vaishali Nagar","Jaipur - Mansarovar","Jaipur - Malviya Nagar",
-      "Jodhpur - Ratanada","Jodhpur - Sardarpura",
-      "Udaipur - Hiran Magri","Kota - Talwandi","Ajmer - Civil Lines"
-    ],
-    "Madhya Pradesh": [
-      "Indore - Vijay Nagar","Indore - Palasia","Bhopal - MP Nagar","Bhopal - Arera Colony",
-      "Gwalior - City Centre","Jabalpur - Napier Town"
-    ],
-    "Uttar Pradesh": [
-      "Lucknow - Gomti Nagar","Lucknow - Aliganj","Noida - Sector 62","Noida - Sector 18",
-      "Ghaziabad - Vaishali","Kanpur - Swaroop Nagar","Varanasi - Lanka"
-    ],
-    "Maharashtra": [
-      "Mumbai - Andheri","Mumbai - Borivali","Pune - Hinjewadi","Pune - Wakad",
-      "Nagpur - Dharampeth","Nashik - College Road"
-    ],
-    "Other": ["Other Area"]
-  };
+  <div class="grid">
+    <!-- LEFT -->
+    <div class="card">
+      <h2>1) Login via Mail ID + Password (SheetDB)</h2>
 
-  function populateAreasForState(state, preselectValue){
-    const areaSel = document.getElementById("area");
-    if(!areaSel) return;
+      <div class="hint">
+        SheetDB Base: <span class="tag" id="sheetdbTag"></span>
+        <div class="hint">Sheets required: <b>users</b>, <b>orders</b>. (products optional)</div>
+      </div>
 
-    const list = AREAS_BY_STATE[state] || AREAS_BY_STATE["Other"] || [];
-    const current = preselectValue ?? "";
-
-    // clear
-    areaSel.innerHTML = "";
-    const ph = document.createElement("option");
-    ph.value = "";
-    ph.textContent = "Select area";
-    areaSel.appendChild(ph);
-
-    list.forEach(a=>{
-      const opt = document.createElement("option");
-      opt.value = a;
-      opt.textContent = a;
-      if(current && current === a) opt.selected = true;
-      areaSel.appendChild(opt);
-    });
-
-    // If preselect not in list and is non-empty, add it (prevents losing stored data)
-    if(current && !list.includes(current)){
-      const opt = document.createElement("option");
-      opt.value = current;
-      opt.textContent = current + " (saved)";
-      opt.selected = true;
-      areaSel.appendChild(opt);
-    }
-  }
-
-
-  // =============================
-  // STORAGE KEYS
-  // =============================
-  const K_USERS = "b2b_users_v1";
-  const K_SESSION = "b2b_session_v1";
-  const K_PRODUCTS = "b2b_products_v1";
-  const K_CART = "b2b_cart_v1";
-  const K_DISCOUNTS = "b2b_discounts_v1";
-  const K_BASETYPE = "b2b_basetype_v1";
-
-  // =============================
-  // SEED PRODUCTS (edit as needed)
-  // =============================
-  const SEED_PRODUCTS = [
-    { id:"P1", brand:"AZIN-500", company:"Ahanitya Pharma Life Science LLP", strength:"Azithromycin Tablets I.P 500 mg", pack:"10x10", type:"TAB", hsn:"", gst:12, basePrice:140, status:"available" },
-    { id:"P2", brand:"ASP", company:"Ahanitya Pharma Life Science LLP", strength:"Aceclofenac + Paracetamol + Serratiopeptidase", pack:"10x10", type:"TAB", hsn:"", gst:12, basePrice:140, status:"available" },
-    { id:"P3", brand:"A-SUNAC", company:"Ahanitya Pharma Life Science LLP", strength:"Aceclofenac + Paracetamol", pack:"10x10", type:"TAB", hsn:"", gst:12, basePrice:135, status:"available" },
-    { id:"P4", brand:"PANTO-DSR", company:"Ahanitya Pharma Life Science LLP", strength:"Pantoprazole 40 mg + Domperidone 30 mg", pack:"10x10", type:"CAP", hsn:"", gst:12, basePrice:140, status:"soon" },
-    { id:"P5", brand:"LE-MONT", company:"Ahanitya Pharma Life Science LLP", strength:"Montelukast + Levocetirizine", pack:"10x10", type:"TAB", hsn:"", gst:12, basePrice:120, status:"available" }
-  ];
-
-  // =============================
-  // HELPERS
-  // =============================
-  const $ = (id)=>document.getElementById(id);
-  const money = (n)=> (Number(n||0)).toFixed(2);
-  const safeJson = (s, fallback)=>{ try{return JSON.parse(s)}catch(e){return fallback} };
-  const nowId = ()=> "ORD-" + Date.now().toString().slice(-8);
-
-  function load(key, fallback){
-    const v = localStorage.getItem(key);
-    if(!v) return fallback;
-    try{ return JSON.parse(v); }catch(e){ return fallback; }
-  }
-  function save(key, obj){ localStorage.setItem(key, JSON.stringify(obj)); }
-
-  function initStorage(){
-    const prods = load(K_PRODUCTS, null);
-    if(!prods){ save(K_PRODUCTS, SEED_PRODUCTS); }
-    const discounts = load(K_DISCOUNTS, null);
-    if(!discounts){ save(K_DISCOUNTS, SETTINGS.DEFAULT_DISCOUNTS); }
-    const baseType = localStorage.getItem(K_BASETYPE);
-    if(!baseType){ localStorage.setItem(K_BASETYPE, SETTINGS.BASE_PRICE_TYPE); }
-    const users = load(K_USERS, null);
-    if(!users){ save(K_USERS, []); }
-    const cart = load(K_CART, null);
-    if(!cart){ save(K_CART, []); }
-  }
-
-  function setMsg(el, text, type){
-    el.classList.remove("hide","ok","bad");
-    el.classList.add(type==="ok" ? "ok" : "bad");
-    el.textContent = text;
-  }
-
-  function hideMsg(el){ el.classList.add("hide"); el.textContent=""; el.classList.remove("ok","bad"); }
-
-  function getSession(){ return load(K_SESSION, null); }
-  function setSession(s){ save(K_SESSION, s); }
-  function clearSession(){ localStorage.removeItem(K_SESSION); }
-
-  function currentDiscounts(){ return load(K_DISCOUNTS, SETTINGS.DEFAULT_DISCOUNTS); }
-  function currentBaseType(){ return localStorage.getItem(K_BASETYPE) || SETTINGS.BASE_PRICE_TYPE; }
-
-  function calcPrice(product, role){
-    const discounts = currentDiscounts();
-    const d = Number(discounts[role] ?? 0);
-    const base = Number(product.basePrice || 0);
-    const net = base * (1 - d/100);
-    return { base, discount:d, net };
-  }
-
-  function pillUpdate(){
-    const s = getSession();
-    $("pillStatus").textContent = s ? `Logged in: ${s.role.toUpperCase()} • ${s.mobile}` : "Not logged in";
-  }
-
-  function showView(){
-    const s = getSession();
-    const isAdmin = s && s.isAdmin;
-    $("viewAuth").classList.toggle("hide", !!s);
-    $("viewStore").classList.toggle("hide", !s || isAdmin);
-    $("viewAdmin").classList.toggle("hide", !isAdmin);
-    $("viewCartLocked").classList.toggle("hide", !!s && !isAdmin);
-    $("viewCart").classList.toggle("hide", !s || isAdmin);
-    if(isAdmin){
-      document.getElementById("viewCartLocked").innerHTML = `<h2>Cart</h2><div class="msg">Admin mode - cart is disabled. Use Logout to return to user view.</div>`;
-    }
-
-    if(s && !isAdmin){
-      $("who").textContent = `${s.bizName} (${s.role}) • ${s.city}${s.area ? ", " + s.area : ""}`;
-      // Ensure area dropdown matches selected state and keeps saved area
-      if(document.getElementById("city")){
-        document.getElementById("city").value = s.city || document.getElementById("city").value;
-        populateAreasForState(document.getElementById("city").value, s.area || "");
-      }
-      $("roleTag").textContent = s.role;
-      $("roleTag").className = "tag";
-      if(s.role==="partner") $("roleTag").classList.add("off");
-      $("waNumber").value = $("waNumber").value || SETTINGS.DEFAULT_WA;
-      $("toEmail").value = $("toEmail").value || SETTINGS.DEFAULT_EMAIL;
-      renderProducts();
-      renderCart();
-    }
-    if(isAdmin){
-      renderAdmin();
-    }
-    pillUpdate();
-  }
-
-  // =============================
-  // AUTH
-  // =============================
-  function validateState(city){
-    return city === SETTINGS.SERVICE_CITY_ONLY;
-  }
-
-  function signup(){
-    const role = $("role").value;
-    const mobile = $("mobile").value.trim();
-    const pass = $("password").value.trim();
-    const bizName = $("bizName").value.trim();
-    const gstin = $("gstin").value.trim();
-    const dlno = $("dlno").value.trim();
-    const city = $("city").value;
-    const area = $("area").value;
-    const address = $("address").value.trim();
-
-    const msg = $("authMsg");
-    hideMsg(msg);
-
-    if(!mobile || mobile.length < 10) return setMsg(msg,"Enter a valid mobile number.", "bad");
-    if(!pass || pass.length < 4) return setMsg(msg,"Password must be at least 4 characters.", "bad");
-    if(!bizName) return setMsg(msg,"Enter business/shop name.", "bad");
-    if(!address) return setMsg(msg,"Enter delivery address.", "bad");
-
-    if(!validateState(city)){
-      return setMsg(msg,`Service currently active only in Gujarat. Please select Gujarat to proceed.`, "bad");
-    }
-    if(!area){
-      return setMsg(msg,"Select delivery area (Ahmedabad).", "bad");
-    }
-
-    const users = load(K_USERS, []);
-    if(users.find(u=>u.mobile===mobile)){
-      return setMsg(msg,"Account already exists. Please login.", "bad");
-    }
-    users.push({ mobile, pass, role, bizName, gstin, dlno, city, area, address, approved:true, createdAt:Date.now() });
-    save(K_USERS, users);
-    setMsg(msg,"Account created! Now click Login.", "ok");
-  }
-
-  function login(){
-    const role = $("role").value;
-    const mobile = $("mobile").value.trim();
-    const pass = $("password").value.trim();
-    const msg = $("authMsg");
-    hideMsg(msg);
-
-    const users = load(K_USERS, []);
-    const u = users.find(x=>x.mobile===mobile && x.pass===pass);
-    if(!u) return setMsg(msg,"Invalid login. Check mobile/password or create account.", "bad");
-    if(u.role !== role) return setMsg(msg,"Role mismatch. Select the correct Business Type (Role).", "bad");
-    if(!u.approved) return setMsg(msg,"Your account is pending approval.", "bad");
-    if(!validateState(u.city)) return setMsg(msg,`Service currently active only in Gujarat.`, "bad");
-
-    setSession({ ...u, isAdmin:false });
-    setMsg(msg,"Login successful. Loading store...", "ok");
-    setTimeout(()=>{ hideMsg(msg); showView(); }, 250);
-  }
-
-  function adminLogin(){
-    const pin = prompt("Enter Admin PIN:");
-    if(pin === null) return;
-    if(String(pin).trim() !== SETTINGS.ADMIN_PIN){
-      return setMsg($("authMsg"),"Wrong Admin PIN.", "bad");
-    }
-    setSession({ isAdmin:true, role:"admin", mobile:"ADMIN", bizName:"Admin", city:SETTINGS.SERVICE_CITY_ONLY });
-    showView();
-  }
-
-  function logout(){
-    clearSession();
-    showView();
-  }
-
-  // =============================
-  // PRODUCTS (STORE VIEW)
-  // =============================
-  function productMatches(p, q){
-    if(!q) return true;
-    const s = (p.brand+" "+p.company+" "+p.strength+" "+(p.hsn||"")).toLowerCase();
-    return s.includes(q.toLowerCase());
-  }
-
-  function renderProducts(){
-    const s = getSession();
-    if(!s) return;
-
-    const q = $("search").value.trim();
-    const av = $("availability").value;
-
-    const products = load(K_PRODUCTS, []);
-    const rows = products
-      .filter(p => productMatches(p,q))
-      .filter(p => av==="all" ? true : (av==="available" ? p.status==="available" : p.status==="soon"));
-
-    const tbody = $("productRows");
-    tbody.innerHTML = "";
-
-    rows.forEach(p=>{
-      const pr = calcPrice(p, s.role);
-      const statusTag = p.status==="available"
-        ? `<span class="tag">Available</span>`
-        : `<span class="tag soon">Coming Soon</span>`;
-
-      const disabled = p.status!=="available" ? "disabled" : "";
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${p.brand}<div class="mini">${statusTag}</div></td>
-        <td>${p.company}</td>
-        <td>${p.strength}</td>
-        <td>${p.pack}</td>
-        <td>${p.type}</td>
-        <td>${p.hsn || ""}</td>
-        <td>${p.gst}%</td>
-        <td>
-          <div class="price">INR ${money(pr.net)} + GST</div>
-          <div class="mini">Base INR ${money(pr.base)} • Disc ${pr.discount}%</div>
-        </td>
-        <td>
-          <input class="qty-input" type="number" min="1" step="1" value="1" id="qty_${p.id}" ${disabled} />
-        </td>
-        <td>
-          <button class="btn" ${disabled} data-add="${p.id}">Add</button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    // wire add buttons
-    [...tbody.querySelectorAll("button[data-add]")].forEach(btn=>{
-      btn.addEventListener("click", ()=>{
-        const id = btn.getAttribute("data-add");
-        const qty = Number($("qty_"+id).value || 1);
-        addToCart(id, qty);
-      });
-    });
-  }
-
-  // =============================
-  // CART
-  // =============================
-  function addToCart(productId, qty){
-    const cart = load(K_CART, []);
-    const existing = cart.find(i=>i.productId===productId);
-    if(existing) existing.qty += qty;
-    else cart.push({ productId, qty });
-    save(K_CART, cart);
-    renderCart();
-    setMsg($("orderMsg"),"Added to cart.", "ok");
-    setTimeout(()=>hideMsg($("orderMsg")), 900);
-  }
-
-  function removeFromCart(productId){
-    let cart = load(K_CART, []);
-    cart = cart.filter(i=>i.productId!==productId);
-    save(K_CART, cart);
-    renderCart();
-  }
-
-  function updateCartQty(productId, qty){
-    const cart = load(K_CART, []);
-    const item = cart.find(i=>i.productId===productId);
-    if(!item) return;
-    item.qty = Math.max(1, qty);
-    save(K_CART, cart);
-    renderCart();
-  }
-
-  function clearCart(){
-    save(K_CART, []);
-    renderCart();
-  }
-
-  function buildOrderText(){
-    const s = getSession();
-    const cart = load(K_CART, []);
-    const products = load(K_PRODUCTS, []);
-    const baseType = currentBaseType();
-    const discounts = currentDiscounts();
-    const po = $("poNote").value.trim();
-    let lastInv = Number(localStorage.getItem("lastInvoiceNo") || 1000);
-lastInv++;localStorage.setItem("lastInvoiceNo", lastInv);
-const orderId = "APLSL-INV-" + lastInv;
-
-    let lines = [];
-    lines.push(`APLSL B2B Medicine Order`);
-    lines.push(`Order ID: ${orderId}`);
-    lines.push(`Date: ${new Date().toLocaleString()}`);
-    lines.push(``);
-    lines.push(`Buyer: ${s.bizName}`);
-    lines.push(`Role: ${s.role}`);
-    lines.push(`Mobile: ${s.mobile}`);
-    if(s.gstin) lines.push(`GSTIN: ${s.gstin}`);
-    if(s.dlno) lines.push(`DL No: ${s.dlno}`);
-    lines.push(`Delivery: ${s.city}${s.area? ", "+s.area:""}`);
-    lines.push(`Address: ${s.address}`);
-    lines.push(``);
-    lines.push(`Pricing: Base ${baseType} | Discount: ${Number(discounts[s.role] ?? 0)}%`);
-    lines.push(``);
-    lines.push(`Items:`);
-
-    let total = 0;
-    cart.forEach((ci, idx)=>{
-      const p = products.find(x=>x.id===ci.productId);
-      if(!p) return;
-      const pr = calcPrice(p, s.role);
-
-      const taxable = pr.net * ci.qty;
-      const gstAmt = taxable * ((p.gst||0)/100);
-      const lineTotal = taxable + gstAmt;
-      total += lineTotal;
-
-      lines.push(`${idx+1}. ${p.brand} (${p.type}) - ${p.strength} | Pack ${p.pack} | HSN ${p.hsn||"-"} | Qty ${ci.qty} | Rate INR ${money(pr.net)} | Taxable INR ${money(taxable)} | GST ${p.gst||0}% (INR ${money(gstAmt)}) | Total INR ${money(lineTotal)}`);
-    });
-
-    lines.push(``);
-    // Totals
-    let subTotal = 0;
-    let gstTotal = 0;
-    cart.forEach((ci)=>{
-      const p = products.find(x=>x.id===ci.productId);
-      if(!p) return;
-      const pr = calcPrice(p, s.role);
-      const taxable = pr.net * ci.qty;
-      const gstAmt = taxable * ((p.gst||0)/100);
-      subTotal += taxable;
-      gstTotal += gstAmt;
-    });
-    const grandTotal = subTotal + gstTotal;
-
-    const isGujarat = (s.city === "Gujarat");
-    const cgst = isGujarat ? gstTotal/2 : 0;
-    const sgst = isGujarat ? gstTotal/2 : 0;
-    const igst = isGujarat ? 0 : gstTotal;
-
-    lines.push(`Subtotal (Taxable): INR ${money(subTotal)}`);
-    lines.push(`GST Total: INR ${money(gstTotal)}`);
-    if(isGujarat){
-      lines.push(`CGST: INR ${money(cgst)} | SGST: INR ${money(sgst)}`);
-    } else {
-      lines.push(`IGST: INR ${money(igst)}`);
-    }
-    lines.push(`Grand Total: INR ${money(grandTotal)}`);
-    if(po) {
-      lines.push(``);
-      lines.push(`PO Note: ${po}`);
-    }
-    lines.push(``);
-    lines.push(`- Sent from APLSL B2B Portal`);
-    return { text: lines.join("\n"), total, orderId };
-  }
-
-  function renderCart(){
-    const s = getSession();
-    if(!s || s.isAdmin) return;
-
-    const cart = load(K_CART, []);
-    const products = load(K_PRODUCTS, []);
-    const wrap = $("cartList");
-
-    if(cart.length===0){
-      wrap.innerHTML = `<div class="note">Your cart is empty. Add products from the catalog.</div>`;
-      $("grandTotal").textContent = money(0);
-      return;
-    }
-
-    let total = 0;
-    let html = `<div style="display:grid;gap:10px">`;
-
-    cart.forEach(ci=>{
-      const p = products.find(x=>x.id===ci.productId);
-      if(!p) return;
-      const pr = calcPrice(p, s.role);
-      const lineTotal = (pr.net * (1 + (p.gst||0)/100)) * ci.qty;
-      total += lineTotal;
-
-      html += `
-        <div class="card" style="padding:10px;border-radius:14px">
-          <div class="split">
-            <div>
-              <div style="font-weight:800">${p.brand} <span class="mini">(${p.type})</span></div>
-              <div class="mini">${p.strength}</div>
-              <div class="mini">INR ${money(pr.net)} + GST ${p.gst}% • Pack ${p.pack}</div>
-            </div>
-            <button class="danger" data-remove="${p.id}" style="padding:8px 10px;border-radius:10px">Remove</button>
+      <div id="authBox">
+        <div class="row1">
+          <div>
+            <label>Email *</label>
+            <input type="email" id="authEmail" placeholder="e.g., retailer@gmail.com" autocomplete="email">
           </div>
+          <div>
+            <label>Password *</label>
+            <input type="password" id="authPass" placeholder="Create a password" autocomplete="current-password">
+          </div>
+          <div class="right">
+            <button class="secondary smallbtn" id="btnSignup">Create Account</button>
+            <button class="smallbtn" id="btnLogin">Login</button>
+          </div>
+          <div class="hint" id="authMsg"></div>
+        </div>
+      </div>
 
-          <div class="row" style="margin-top:8px">
-            <div>
-              <label style="margin-top:0">Qty</label>
-              <input type="number" min="1" step="1" value="${ci.qty}" data-qty="${p.id}">
-            </div>
-            <div>
-              <label style="margin-top:0">Line Total</label>
-              <div class="msg" style="margin-top:0">INR <b>${money(lineTotal)}</b></div>
-            </div>
+      <div id="appBox" class="hidden">
+        <div class="sep"></div>
+        <h2>2) Select Category + Fill Details</h2>
+
+        <div class="row1">
+          <div>
+            <label>Category *</label>
+            <select id="category">
+              <option value="">Select</option>
+              <option>Retailer</option>
+              <option>Wholesaler/Stockist</option>
+              <option>Doctor</option>
+              <option>Hospital</option>
+              <option>Clinic</option>
+            </select>
           </div>
         </div>
-      `;
-    });
 
-    html += `</div>`;
-    wrap.innerHTML = html;
+        <div class="row">
+          <div>
+            <label>Party / Name *</label>
+            <input id="partyName" placeholder="Shop / Hospital / Doctor / Clinic name">
+          </div>
+          <div>
+            <label>Mobile No *</label>
+            <input id="partyMobile" placeholder="10-digit mobile">
+          </div>
+        </div>
 
-    // Totals breakdown
-    let subTotal = 0;
-    let gstTotal = 0;
+        <div class="row">
+          <div>
+            <label>Email (party)</label>
+            <input id="partyEmail" placeholder="optional (different from login)">
+          </div>
+          <div>
+            <label>GSTIN</label>
+            <input id="partyGSTIN" placeholder="optional">
+          </div>
+        </div>
 
-    cart.forEach(ci=>{
-      const p = products.find(x=>x.id===ci.productId);
-      if(!p) return;
-      const pr = calcPrice(p, s.role);
-      const taxable = pr.net * ci.qty;
-      const gstAmt = taxable * ((p.gst||0)/100);
-      subTotal += taxable;
-      gstTotal += gstAmt;
-    });
+        <div class="row">
+          <div>
+            <label>State *</label>
+            <select id="partyState">
+              <option value="">Select State</option>
+              <option value="GJ">Gujarat</option>
+              <option value="RJ">Rajasthan</option>
+              <option value="MP">Madhya Pradesh</option>
+              <option value="UP">Uttar Pradesh</option>
+              <option value="MH">Maharashtra</option>
+              <option value="DL">Delhi</option>
+              <option value="HR">Haryana</option>
+              <option value="PB">Punjab</option>
+              <option value="BR">Bihar</option>
+              <option value="WB">West Bengal</option>
+              <option value="KA">Karnataka</option>
+              <option value="TN">Tamil Nadu</option>
+              <option value="TS">Telangana</option>
+              <option value="AP">Andhra Pradesh</option>
+              <option value="KL">Kerala</option>
+              <option value="OR">Odisha</option>
+              <option value="CT">Chhattisgarh</option>
+              <option value="JH">Jharkhand</option>
+              <option value="AS">Assam</option>
+            </select>
+            <div class="hint">Seller state assumed = <b>Gujarat</b>. Gujarat → CGST+SGST, other → IGST.</div>
+          </div>
+          <div>
+            <label>GST % (editable)</label>
+            <input id="gstPercent" type="number" min="0" step="0.01" value="12">
+          </div>
+        </div>
 
-    const grand = subTotal + gstTotal;
+        <div class="row1">
+          <div>
+            <label>Address</label>
+            <textarea id="partyAddress" placeholder="Full address (optional)"></textarea>
+          </div>
+        </div>
 
-    const subEl = document.getElementById("subTotal");
-    const gstEl = document.getElementById("gstTotal");
-    const grandEl = document.getElementById("grandTotal");
-    if(subEl) subEl.textContent = money(subTotal);
-    if(gstEl) gstEl.textContent = money(gstTotal);
-    if(grandEl) grandEl.textContent = money(grand);
+        <div class="sep"></div>
+        <h2>Invoice Settings</h2>
+        <div class="row">
+          <div>
+            <label>Invoice No (auto / edit here)</label>
+            <input id="invoiceNo" placeholder="e.g., APLSL-INV-0001">
+            <div class="hint">✅ <b>Where to set invoice no:</b> edit this box. If blank, auto-generated.</div>
+          </div>
+          <div>
+            <label>Invoice Date</label>
+            <input id="invoiceDate" type="date">
+          </div>
+        </div>
+      </div>
+    </div>
 
-    // GST split (Gujarat => CGST+SGST; else IGST)
-    const isGujarat = (s.city === "Gujarat");
-    const cgst = isGujarat ? gstTotal/2 : 0;
-    const sgst = isGujarat ? gstTotal/2 : 0;
-    const igst = isGujarat ? 0 : gstTotal;
+    <!-- RIGHT -->
+    <div class="card">
+      <h2>3) Select Product from List & Quantity</h2>
 
-    const cgstEl = document.getElementById("cgstAmt");
-    const sgstEl = document.getElementById("sgstAmt");
-    const igstEl = document.getElementById("igstAmt");
-    const igstRow = document.getElementById("igstRow");
+      <div class="row">
+        <div>
+          <label>Search</label>
+          <input id="search" placeholder="Search by Product Name / Strength / Category / Class...">
+        </div>
+        <div>
+          <label>Quick Actions</label>
+          <div class="right">
+            <button class="secondary smallbtn" id="btnResetQty">Reset Qty</button>
+            <button class="secondary smallbtn" id="btnLoadDemoRates">Load Sample Company Rates</button>
+          </div>
+          <div class="hint">Replace company rates inside code (search: <b>companyRatesByRole</b>).</div>
+        </div>
+      </div>
 
-    if(cgstEl) cgstEl.textContent = money(cgst);
-    if(sgstEl) sgstEl.textContent = money(sgst);
-    if(igstEl) igstEl.textContent = money(igst);
-    if(igstRow) igstRow.classList.toggle("hide", isGujarat);
+      <div style="overflow:auto;border:1px solid var(--line);border-radius:14px;margin-top:10px">
+        <table>
+          <thead>
+            <tr>
+              <th>Sr.</th>
+              <th>Product</th>
+              <th>Strength</th>
+              <th>Type</th>
+              <th>Pack</th>
+              <th>Category</th>
+              <th>Class</th>
+              <th>Indication</th>
+              <th>MRP / Strip</th>
+              <th>Company Rate</th>
+              <th>Qty</th>
+            </tr>
+          </thead>
+          <tbody id="prodBody"></tbody>
+        </table>
+      </div>
 
-    // Also keep old variable for compatibility
-    total = grand;
-// wire events
-    [...wrap.querySelectorAll("button[data-remove]")].forEach(btn=>{
-      btn.addEventListener("click", ()=> removeFromCart(btn.getAttribute("data-remove")));
-    });
-    [...wrap.querySelectorAll("input[data-qty]")].forEach(inp=>{
-      inp.addEventListener("change", ()=>{
-        updateCartQty(inp.getAttribute("data-qty"), Number(inp.value||1));
-      });
-    });
+      <div class="sep"></div>
+      <h2>4) Cart & Checkout (GST + Totals)</h2>
+
+      <div class="totals">
+        <div class="kpi">
+          <div class="muted">Subtotal (Company Rate × Qty)</div>
+          <div class="v" id="subTotal">₹0.00</div>
+        </div>
+        <div class="kpi">
+          <div class="muted">GST Total</div>
+          <div class="v" id="gstTotal">₹0.00</div>
+        </div>
+        <div class="kpi">
+          <div class="muted">Grand Total</div>
+          <div class="v" id="grandTotal">₹0.00</div>
+        </div>
+        <div class="kpi">
+          <div class="muted">GST Split</div>
+          <div class="v" id="gstSplit">—</div>
+          <div class="hint" id="gstSplitHint"></div>
+        </div>
+      </div>
+
+      <div class="row1" style="margin-top:10px">
+        <div>
+          <label>Order Notes</label>
+          <textarea id="orderNotes" placeholder="Optional notes"></textarea>
+        </div>
+      </div>
+
+      <div class="right" style="margin-top:10px">
+        <button class="secondary smallbtn" id="btnPreview">Preview Message</button>
+        <button class="smallbtn" id="btnPDF">Generate PDF Bill</button>
+        <button class="smallbtn" id="btnSubmitSheet">Submit Order (SheetDB)</button>
+        <button class="secondary smallbtn" id="btnWA">Send WhatsApp</button>
+      </div>
+
+      <div class="hint" id="checkoutMsg"></div>
+
+      <div class="sep"></div>
+      <h2>5) Order History (from SheetDB)</h2>
+
+      <div style="overflow:auto;border:1px solid var(--line);border-radius:14px">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Invoice No</th>
+              <th>Category</th>
+              <th>Items</th>
+              <th>Subtotal</th>
+              <th>GST</th>
+              <th>Grand</th>
+            </tr>
+          </thead>
+          <tbody id="orderHistory"></tbody>
+        </table>
+      </div>
+      <div class="right" style="margin-top:10px">
+        <button class="secondary smallbtn" id="btnRefreshHistory">Refresh History</button>
+      </div>
+
+      <div class="hint">
+        ✅ Order stored in Google Sheet via SheetDB.  
+        If you want **auto email to Ahanitya**, add a Google Sheet Apps Script trigger (code provided below message).
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================
+   SHEETDB CONFIG
+========================= */
+const SHEETDB_BASE = "https://sheetdb.io/api/v1/oq0xux451r2tn"; // your SheetDB
+const SHEET_USERS  = "users";
+const SHEET_ORDERS = "orders";
+
+/* =========================
+   BUSINESS CONFIG
+========================= */
+const SELLER_STATE = "GJ";
+const DEST_WA = "918487090212"; // +91 8487090212
+const APLSL_EMAIL = "infoahanityapharmalifescellp@gmail.com";
+
+/* =========================
+   UI HELPERS
+========================= */
+const el = (id)=> document.getElementById(id);
+function setAuthMsg(msg, type=""){ el("authMsg").innerHTML = type ? `<span class="${type}">${msg}</span>` : msg; }
+function setCheckoutMsg(msg, type=""){ el("checkoutMsg").innerHTML = type ? `<span class="${type}">${msg}</span>` : msg; }
+function money(n){ const x = Number(n||0); return "₹" + x.toFixed(2); }
+function todayISO(){ const d=new Date(); const p=(x)=>String(x).padStart(2,"0"); return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()); }
+function nowNice(){ return new Date().toLocaleString(); }
+function escapeQuotes(s){ return String(s).replaceAll("\\","\\\\").replaceAll("'","\\'"); }
+
+/* =========================
+   LOCAL SESSION ONLY
+========================= */
+const LS_SESSION = "aplsl_session_sheetdb_v1";
+let session = (()=>{ try{ return JSON.parse(localStorage.getItem(LS_SESSION)||"null"); }catch(e){return null;} })();
+
+/* =========================
+   PRODUCTS (your list)
+========================= */
+let products = [
+  { sr:1, name:"AZIN-500", strength:"Azithromycin Tablets I.P 500 mg", type:"Tablet", pack:"10X3", category:"Anti-Infective / Antibiotic", class:"Rx", indication:"Bacterial infections, Respiratory tract infections (Bronchitis, Pneumonia), ENT infections (Pharyngitis, Tonsillitis, Sinusitis)", mrp:95 },
+  { sr:2, name:"ASP", strength:"Aceclofenac 100mg + Paracetamol 325mg + Serratiopeptidase 15 mg", type:"Tablet", pack:"10X10", category:"Analgesic & Anti-Inflammatory", class:"Rx", indication:"Relief of pain, inflammation, and swelling in arthritis, trauma, dental pain, post-surgery, and musculoskeletal disorders.", mrp:150 },
+  { sr:3, name:"A-SUNAC", strength:"Aceclofenac 100 mg, Paracetamol 325mg", type:"Tablet", pack:"10X10", category:"Analgesic, Antipyretic, Anti-inflammatory & Anti-cold preparation", class:"Rx", indication:"Relief from cold, flu, fever, headache, body pain & nasal congestion.", mrp:80 },
+  { sr:4, name:"APLSL-DiaMet", strength:"Glimepiride 2 mg + Metformin HCl (ER)", type:"Tablet", pack:"—", category:"Anti-diabetic", class:"Rx", indication:"Type 2 diabetes management", mrp:null },
+  { sr:5, name:"APLSL-Lulizid", strength:"Luliconazole 1%", type:"Cream", pack:"—", category:"Antifungal", class:"Rx", indication:"Skin fungal infections", mrp:null },
+  { sr:6, name:"Ahanitya-Ketozin", strength:"Ketoconazole 2%", type:"Shampoo", pack:"—", category:"Antifungal", class:"OTC", indication:"Dandruff, seborrheic dermatitis", mrp:null },
+  { sr:7, name:"APLSL-Cutiderm", strength:"Itraconazole 1% + Ofloxacin 0.75% + Ornidazole 2% + Clobetasol 0.05%", type:"Cream", pack:"—", category:"Antifungal & Antibacterial", class:"Rx", indication:"Fungal & bacterial skin infections", mrp:null },
+  { sr:8, name:"Ahanitya-AmbroLev", strength:"Ambroxol 60mg + Levocetirizine 2.5mg + Paracetamol 500mg + Phenylephrine 5mg", type:"Tablet", pack:"—", category:"Cold & Flu Relief", class:"Rx", indication:"Relief from cough, cold, nasal congestion, and fever", mrp:null },
+  { sr:9, name:"PANTO-DSR", strength:"Pantoprazole 40 mg + Domperidone 30 mg", type:"Capsule", pack:"10X10", category:"Gastrointestinal", class:"Rx", indication:"Acid reflux, GERD, indigestion", mrp:170 },
+  { sr:10, name:"LE-MONT", strength:"Montelukast 10 mg + Levocetirizine 5 mg", type:"Tablet", pack:"20X10", category:"Anti-allergic (LTRA + Antihistamine)", class:"Rx", indication:"Allergic rhinitis (seasonal & perennial), allergic cough, nasal congestion, sneezing, runny nose.", mrp:180 }
+];
+
+/* =========================
+   COMPANY RATES (EDIT HERE)
+   Format:
+   companyRatesByRole[stateCode][role][productName] = rate
+   Use "ALL" for default state; "__DEFAULT__" for default product.
+========================= */
+let companyRatesByRole = {
+  "ALL": {
+    "Retailer": { "__DEFAULT__": 120, "AZIN-500": 72, "ASP": 105, "A-SUNAC": 55, "PANTO-DSR": 120, "LE-MONT": 130 },
+    "Wholesaler/Stockist": { "__DEFAULT__": 110, "AZIN-500": 68, "ASP": 98, "A-SUNAC": 50, "PANTO-DSR": 112, "LE-MONT": 122 },
+    "Doctor": { "__DEFAULT__": 130, "AZIN-500": 78, "ASP": 112, "A-SUNAC": 60, "PANTO-DSR": 128, "LE-MONT": 138 },
+    "Hospital": { "__DEFAULT__": 125, "AZIN-500": 76, "ASP": 110, "A-SUNAC": 58, "PANTO-DSR": 125, "LE-MONT": 135 },
+    "Clinic": { "__DEFAULT__": 125 }
   }
+};
 
-  // =============================
-  // ORDER SENDERS
-  // =============================
-  function sendWhatsApp(){
-    const s = getSession();
-    if(!s) return;
+/* =========================
+   CRYPTO (PASSWORD HASH)
+========================= */
+async function sha256(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
 
-    const wa = $("waNumber").value.trim() || SETTINGS.DEFAULT_WA;
-    const { text } = buildOrderText();
-
-    // normalize wa number to digits (keep country code)
-    const digits = wa.replace(/[^\d]/g,"");
-    const url = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-    window.open(url, "_blank");
-
-    // optional: log order to Google Sheet
-    const built = buildOrderText();
-    pushOrderToGoogleSheet({
-      orderId: built.orderId,
-      createdAt: new Date().toISOString(),
-      buyer: s.bizName,
-      role: s.role,
-      mobile: s.mobile,
-      state: s.city,
-      area: s.area || "",
-      address: s.address || "",
-      subtotal: Number(document.getElementById("subTotal")?.textContent || 0),
-      gst: Number(document.getElementById("gstTotal")?.textContent || 0),
-      total: Number(document.getElementById("grandTotal")?.textContent || 0),
-      note: (document.getElementById("poNote")?.value || "").trim(),
-      orderText: built.text
-    });
-
-    setMsg($("orderMsg"),"Opened WhatsApp with order message.", "ok");
-  }
-
-  function sendEmail(){
-    const s = getSession();
-    if(!s) return;
-
-    const toEmail = $("toEmail").value.trim() || SETTINGS.DEFAULT_EMAIL;
-    const built = buildOrderText();
-    const text = built.text;
-
-    $("orderTextField").value = text;
-
-    // optional: log order to Google Sheet
-    pushOrderToGoogleSheet({
-      orderId: built.orderId,
-      createdAt: new Date().toISOString(),
-      buyer: s.bizName,
-      role: s.role,
-      mobile: s.mobile,
-      state: s.city,
-      area: s.area || "",
-      address: s.address || "",
-      subtotal: Number(document.getElementById("subTotal")?.textContent || 0),
-      gst: Number(document.getElementById("gstTotal")?.textContent || 0),
-      total: Number(document.getElementById("grandTotal")?.textContent || 0),
-      note: (document.getElementById("poNote")?.value || "").trim(),
-      orderText: text
-    });
-
-    const form = $("emailForm");
-    form.action = `https://formsubmit.co/${encodeURIComponent(toEmail)}`;
-    form.submit();
-
-    setMsg($("orderMsg"),"Email tab opened (FormSubmit). If you are using it first time, it may ask to activate.", "ok");
-  }
-
-  // =============================
-  // ADMIN
-  // =============================
-  function renderAdmin(){
-    const products = load(K_PRODUCTS, []);
-    $("basePriceType").value = currentBaseType();
-
-    const discounts = currentDiscounts();
-    $("discountJson").value = JSON.stringify(discounts);
-
-    const tbody = $("adminRows");
-    tbody.innerHTML = "";
-    products.forEach(p=>{
-      const tr = document.createElement("tr");
-      tr.style.cursor = "pointer";
-      tr.innerHTML = `
-        <td>${p.id}</td>
-        <td>${p.brand}</td>
-        <td>${p.company}</td>
-        <td>${p.hsn || ""}</td>
-        <td>INR ${money(p.basePrice)}</td>
-        <td>${p.status==="available" ? "Available" : "Coming Soon"}</td>
-      `;
-      tr.addEventListener("click", ()=>loadProductToEditor(p.id));
-      tbody.appendChild(tr);
-    });
-  }
-
-  function loadProductToEditor(id){
-    const products = load(K_PRODUCTS, []);
-    const p = products.find(x=>x.id===id);
-    if(!p) return;
-    $("pId").value = p.id;
-    $("pBrand").value = p.brand;
-    $("pCompany").value = p.company;
-    $("pStrength").value = p.strength;
-    $("pPack").value = p.pack;
-    if(document.getElementById("pHsn")) $("pHsn").value = p.hsn || "";
-    $("pType").value = p.type;
-    $("pGst").value = p.gst;
-    $("pPrice").value = p.basePrice;
-    $("pStatus").value = p.status;
-  }
-
-  function saveAdminSettings(){
-    localStorage.setItem(K_BASETYPE, $("basePriceType").value);
-    const d = safeJson($("discountJson").value.trim(), null);
-    if(!d || typeof d !== "object"){
-      alert("Discount JSON invalid. Example: {\"retailer\":0,\"wholesaler\":3}");
-      return false;
-    }
-    save(K_DISCOUNTS, d);
-    return true;
-  }
-
-  function saveProduct(){
-    if(!saveAdminSettings()) return;
-
-    let id = $("pId").value.trim();
-    const brand = $("pBrand").value.trim();
-    const company = $("pCompany").value.trim();
-    const strength = $("pStrength").value.trim();
-    const pack = $("pPack").value.trim();
-    const type = $("pType").value;
-    const hsn = (document.getElementById("pHsn") ? $("pHsn").value.trim() : "");
-    const gst = Number($("pGst").value || 0);
-    const basePrice = Number($("pPrice").value || 0);
-    const status = $("pStatus").value;
-
-    if(!brand || !company || !strength) return alert("Brand, Company, Strength are required.");
-    if(!id) id = "P" + Math.floor(Math.random()*90000 + 10000);
-
-    const products = load(K_PRODUCTS, []);
-    const existing = products.find(p=>p.id===id);
-    const obj = { id, brand, company, strength, pack, type, hsn, gst, basePrice, status };
-
-    if(existing){
-      Object.assign(existing, obj);
-    } else {
-      products.push(obj);
-    }
-    save(K_PRODUCTS, products);
-    renderAdmin();
-    alert("Saved.");
-  }
-
-  function deleteProduct(){
-    if(!saveAdminSettings()) return;
-    const id = $("pId").value.trim();
-    if(!id) return alert("Enter Product ID to delete (or click a row).");
-    if(!confirm("Delete product "+id+"?")) return;
-
-    let products = load(K_PRODUCTS, []);
-    products = products.filter(p=>p.id!==id);
-    save(K_PRODUCTS, products);
-    $("pId").value=""; $("pBrand").value=""; $("pCompany").value=""; $("pStrength").value="";
-    $("pPack").value=""; $("pGst").value=""; $("pPrice").value="";
-    renderAdmin();
-    alert("Deleted.");
-  }
-
-  function adminBack(){
-    alert("Admin panel saved. Please Logout and login as a user to test store flow.");
-  }
-
-  
-  // =============================
-  // GST INVOICE PDF (Client-side)
-  // =============================
-  function generateInvoicePDF(){
-    const s = getSession();
-    if(!s) return;
-
-    const cart = load(K_CART, []);
-    const products = load(K_PRODUCTS, []);
-
-    if(cart.length === 0){
-      setMsg($("orderMsg"),"Cart is empty. Add items first.", "bad");
-      return;
-    }
-
-    const { text, orderId } = buildOrderText(); // also gives orderId
-    // Compute totals
-    let subTotal = 0, gstTotal = 0;
-    const rows = [];
-    cart.forEach((ci, idx)=>{
-      const p = products.find(x=>x.id===ci.productId);
-      if(!p) return;
-      const pr = calcPrice(p, s.role);
-      const taxable = pr.net * ci.qty;
-      const gstAmt = taxable * ((p.gst||0)/100);
-      const lineTotal = taxable + gstAmt;
-      subTotal += taxable;
-      gstTotal += gstAmt;
-
-      rows.push([
-        String(idx+1),
-        p.brand,
-        p.type,
-        (p.hsn||""),
-        p.pack || "",
-        String(ci.qty),
-        money(pr.net),
-        money(taxable),
-        `${p.gst||0}%`,
-        money(gstAmt),
-        money(lineTotal)
-      ]);
-    });
-    const grandTotal = subTotal + gstTotal;
-
-    const isGujarat = (s.city === "Gujarat");
-    const cgst = isGujarat ? gstTotal/2 : 0;
-    const sgst = isGujarat ? gstTotal/2 : 0;
-    const igst = isGujarat ? 0 : gstTotal;
-
-    // jsPDF UMD
-    const jspdf = window.jspdf;
-    if(!jspdf || !jspdf.jsPDF){
-      alert("PDF library failed to load. Please check your internet or CDN access.");
-      return;
-    }
-    const doc = new jspdf.jsPDF("p","mm","a4");
-
-    // Header
-    doc.setFontSize(14);
-    doc.text("TAX INVOICE (GST)", 105, 14, { align:"center" });
-    doc.setFontSize(10);
-    doc.text(`Invoice No: ${orderId}`, 14, 22);
-    doc.text(`Date: ${new Date().toLocaleString()}`, 14, 27);
-
-    // Seller details (edit here if needed)
-    doc.setFontSize(10);
-    doc.text("Seller:", 14, 36);
-    doc.text("Ahanitya Pharma Life Science LLP", 14, 41);
-    doc.text("Address: (Add your office address in code)", 14, 46);
-    doc.text("GSTIN: (Add GSTIN in code)", 14, 51);
-
-    // Buyer details
-    doc.text("Bill To:", 120, 36);
-    doc.text(s.bizName || "-", 120, 41);
-    doc.text(`Role: ${s.role}`, 120, 46);
-    doc.text(`Mobile: ${s.mobile}`, 120, 51);
-    if(s.gstin) doc.text(`GSTIN: ${s.gstin}`, 120, 56);
-    doc.text(`State: ${s.city}`, 120, 61);
-    doc.text(`Area: ${s.area || "-"}`, 120, 66);
-
-    // Table
-    const startY = 74;
-    if(doc.autoTable){
-      doc.autoTable({
-        startY,
-        head: [[
-          "Sr", "Brand", "Type", "HSN", "Pack", "Qty", "Rate", "Taxable", "GST%", "GST Amt", "Total"
-        ]],
-        body: rows,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [17,121,154] },
-        margin: { left: 14, right: 14 }
-      });
-    } else {
-      // fallback: simple text
-      doc.setFontSize(9);
-      doc.text("Items:", 14, startY);
-      let y = startY + 6;
-      rows.forEach(r=>{
-        doc.text(`${r[0]}. ${r[1]} Qty:${r[4]} Total:${r[9]}`, 14, y);
-        y += 5;
-      });
-    }
-
-    const afterY = (doc.lastAutoTable && doc.lastAutoTable.finalY) ? (doc.lastAutoTable.finalY + 8) : 250;
-
-    // Totals box
-    doc.setFontSize(10);
-    doc.text(`Subtotal (Taxable): INR ${money(subTotal)}`, 14, afterY);
-    doc.text(`GST Total: INR ${money(gstTotal)}`, 14, afterY + 6);
-
-    if(isGujarat){
-      doc.text(`CGST: INR ${money(cgst)}   SGST: INR ${money(sgst)}`, 14, afterY + 12);
-    } else {
-      doc.text(`IGST: INR ${money(igst)}`, 14, afterY + 12);
-    }
-
-    doc.setFontSize(12);
-    doc.text(`Grand Total: INR ${money(grandTotal)}`, 14, afterY + 20);
-
-    doc.setFontSize(9);
-    doc.text("This is a system-generated invoice (client-side). For accounting, verify GSTIN/HSN details.", 14, afterY + 28);
-
-    doc.save(`${orderId}_GST_Invoice.pdf`);
-    setMsg($("orderMsg"),"GST Invoice PDF generated and downloaded.", "ok");
-  }
-
-
-  // =============================
-  // GOOGLE SHEET DB SYNC (Products + Orders) - OPTIONAL
-  // =============================
-  // Option A (Recommended no-code): SheetDB
-  //   1) Create a Google Sheet with tabs: products, orders (optional), users (optional)
-  //   2) Connect SheetDB and get your API base URL like: https://sheetdb.io/api/v1/xxxxxx
-  //   3) Put that URL below and set MODE="sheetdb"
-  //
-  // Option B: Google Apps Script Web App
-  //   Deploy a Web App that returns JSON for products and accepts POST for orders.
-  //   Then set MODE="appscript" and paste your web app URL.
-  //
-  const GSHEET = {
-    MODE: "sheetdb", // "sheetdb" or "appscript" or "off"
-    SHEETDB_BASE: "https://sheetdb.io/api/v1/oq0xux451r2tn", // e.g., "https://sheetdb.io/api/v1/oq0xux451r2tn"
-    APPSCRIPT_URL: "", // e.g., "https://script.google.com/macros/s/XXXX/exec"
-    PRODUCTS_SHEET: "products",
-    ORDERS_SHEET: "orders"
-  };
-
-  function normalizeProductRow(r){
-    // Map common column names from Google Sheet -> app fields
-    // Expected columns (recommended):
-    // id, brand, company, strength, pack, type, hsn, gst, basePrice, status
-    const get = (k, alt=[])=>{
-      if(r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== "") return r[k];
-      for(const a of alt){
-        if(r[a] !== undefined && r[a] !== null && String(r[a]).trim() !== "") return r[a];
-      }
-      return "";
-    };
-    return {
-      id: String(get("id", ["ID","Id","productId","Product ID"])).trim() || ("P" + Math.floor(Math.random()*90000+10000)),
-      brand: String(get("brand", ["Brand","Brand Name"])).trim(),
-      company: String(get("company", ["Company","Company Name"])).trim(),
-      strength: String(get("strength", ["Strength","Composition","Molecule"])).trim(),
-      pack: String(get("pack", ["Pack","Packing"])).trim(),
-      type: String(get("type", ["Type","Product Type"])).trim() || "TAB",
-      hsn: String(get("hsn", ["HSN","hsn_code","HSN Code"])).trim(),
-      gst: Number(get("gst", ["GST","gst%","GST%","GST Percent"]) || 0),
-      basePrice: Number(get("basePrice", ["BasePrice","price","Price","PTR","PTS"]) || 0),
-      status: (String(get("status", ["Status","availability","Available"]) || "available").toLowerCase().includes("soon")) ? "soon" : "available"
-    };
-  }
-
-  async function syncProductsFromGoogleSheet(showToast=true){
-    if(GSHEET.MODE === "off") return false;
-
-    try{
-      let data = null;
-
-      if(GSHEET.MODE === "sheetdb"){
-        const base = (GSHEET.SHEETDB_BASE || "").trim();
-        if(!base || base.includes("PASTE_")) throw new Error("SheetDB base URL not set.");
-        const url = `${base}/${encodeURIComponent(GSHEET.PRODUCTS_SHEET)}`;
-        const res = await fetch(url, { method:"GET" });
-        if(!res.ok) throw new Error("SheetDB GET failed: " + res.status);
-        data = await res.json(); // array
-      } else if(GSHEET.MODE === "appscript"){
-        const u = (GSHEET.APPSCRIPT_URL || "").trim();
-        if(!u || u.includes("PASTE_")) throw new Error("Apps Script URL not set.");
-        const res = await fetch(`${u}?action=products`, { method:"GET" });
-        if(!res.ok) throw new Error("Apps Script GET failed: " + res.status);
-        const j = await res.json();
-        data = Array.isArray(j) ? j : (j.products || []);
-      }
-
-      if(!Array.isArray(data)) throw new Error("Products payload is not an array.");
-      const mapped = data.map(normalizeProductRow).filter(p=>p.brand);
-      if(mapped.length === 0) throw new Error("No products found in sheet.");
-
-      save(K_PRODUCTS, mapped);
-      if(getSession() && !getSession().isAdmin){
-        renderProducts();
-        renderCart();
-      }
-      if(getSession() && getSession().isAdmin){
-        renderAdmin();
-      }
-      if(showToast && document.getElementById("orderMsg")){
-        setMsg($("orderMsg"), "Synced products from Google Sheet DB.", "ok");
-        setTimeout(()=>hideMsg($("orderMsg")), 1200);
-      }
-      return true;
-    }catch(e){
-      console.warn("Sheet sync failed:", e);
-      if(showToast && document.getElementById("orderMsg")){
-        setMsg($("orderMsg"), "Google Sheet sync failed. Using local products. ("+ (e.message||e) +")", "bad");
-        setTimeout(()=>hideMsg($("orderMsg")), 2500);
-      }
-      return false;
-    }
-  }
-
-  async function pushOrderToGoogleSheet(orderObj){
-    // Best-effort logging of orders to Sheet (optional).
-    // For SheetDB: POST to /orders
-    // For Apps Script: POST with action=order
-    if(GSHEET.MODE === "off") return;
-
-    try{
-      if(GSHEET.MODE === "sheetdb"){
-        const base = (GSHEET.SHEETDB_BASE || "").trim();
-        if(!base || base.includes("PASTE_")) return;
-        const url = `${base}/${encodeURIComponent(GSHEET.ORDERS_SHEET)}`;
-        await fetch(url, {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ data: [orderObj] })
-        });
-      } else if(GSHEET.MODE === "appscript"){
-        const u = (GSHEET.APPSCRIPT_URL || "").trim();
-        if(!u || u.includes("PASTE_")) return;
-        await fetch(u, {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ action:"order", data: orderObj })
-        });
-      }
-    }catch(e){
-      console.warn("Order push failed:", e);
-    }
-  }
-
-  // =============================
-  // EVENTS
-  // =============================
-  window.addEventListener("load", ()=>{
-    initStorage();
-
-    // Try syncing products from Google Sheet DB (best-effort)
-    syncProductsFromGoogleSheet(false);
-
-    // Populate areas for selected state
-    const stateSel = document.getElementById("city");
-    if(stateSel){
-      populateAreasForState(stateSel.value);
-      stateSel.addEventListener("change", ()=> populateAreasForState(stateSel.value));
-    }
-
-    $("btnSignup").addEventListener("click", signup);
-    $("btnLogin").addEventListener("click", login);
-    $("btnAdminLogin").addEventListener("click", adminLogin);
-    $("btnLogout").addEventListener("click", logout);
-
-    $("btnResetAll").addEventListener("click", ()=>{
-      const ok = confirm("This will clear all saved data (users, products cache, cart, settings) from this browser. Continue?");
-      if(!ok) return;
-      try{
-        localStorage.removeItem(K_USERS);
-        localStorage.removeItem(K_SESSION);
-        localStorage.removeItem(K_PRODUCTS);
-        localStorage.removeItem(K_CART);
-        localStorage.removeItem(K_DISCOUNTS);
-        localStorage.removeItem(K_BASETYPE);
-      }catch(e){ console.warn(e); }
-      alert("Cleared! The page will reload.");
-      location.reload();
-    });
-
-    const syncBtn = document.getElementById("btnSyncProducts");
-    if(syncBtn){ syncBtn.addEventListener("click", ()=>syncProductsFromGoogleSheet(true)); }
-
-    $("search").addEventListener("input", renderProducts);
-    $("availability").addEventListener("change", renderProducts);
-
-    $("btnWhatsApp").addEventListener("click", sendWhatsApp);
-    $("btnEmail").addEventListener("click", sendEmail);
-    const pdfBtn = document.getElementById("btnPdf");
-    if(pdfBtn){ pdfBtn.addEventListener("click", generateInvoicePDF); }
-    $("btnClearCart").addEventListener("click", ()=>{ clearCart(); setMsg($("orderMsg"),"Cart cleared.", "ok"); setTimeout(()=>hideMsg($("orderMsg")),900); });
-
-    $("btnSaveProduct").addEventListener("click", saveProduct);
-    $("btnDeleteProduct").addEventListener("click", deleteProduct);
-    $("btnAdminBack").addEventListener("click", adminBack);
-    const adminLogoutBtn = document.getElementById("btnAdminLogout");
-    if(adminLogoutBtn){ adminLogoutBtn.addEventListener("click", logout); }
-
-    // Prefill send-to fields
-    $("waNumber").value = SETTINGS.DEFAULT_WA;
-    $("toEmail").value = SETTINGS.DEFAULT_EMAIL;
-
-    // Rehydrate session
-    showView();
+/* =========================
+   SHEETDB HELPERS
+========================= */
+async function sheetGet(path){
+  const r = await fetch(`${SHEETDB_BASE}/${path}`, { method:"GET" });
+  if(!r.ok) throw new Error(`SheetDB GET failed (${r.status})`);
+  return await r.json();
+}
+async function sheetPost(sheetName, rowObj){
+  const r = await fetch(`${SHEETDB_BASE}/${sheetName}`, {
+    method:"POST",
+    headers: { "Content-Type":"application/json" },
+    body: JSON.stringify({ data: [rowObj] })
   });
+  const data = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(`SheetDB POST failed (${r.status})`);
+  // SheetDB returns {created: 1} typically
+  return data;
+}
+async function sheetSearch(sheetName, field, value){
+  const url = `${SHEETDB_BASE}/${sheetName}/search?${encodeURIComponent(field)}=${encodeURIComponent(value)}`;
+  const r = await fetch(url, { method:"GET" });
+  if(!r.ok) throw new Error(`SheetDB SEARCH failed (${r.status})`);
+  return await r.json();
+}
+
+/* =========================
+   UI STATE
+========================= */
+let cartQty = {};
+function getRole(){ return (el("category").value||"").trim(); }
+function getState(){ return (el("partyState").value||"").trim(); }
+function getGSTPercent(){ const v=Number(el("gstPercent").value); return isFinite(v)?Math.max(0,v):0; }
+
+function getRateFor(p){
+  const role=getRole(), st=getState(), name=p.name;
+  const rates=companyRatesByRole||{};
+  const tryGet=(a,b,c)=>rates?.[a]?.[b]?.[c];
+  let r = tryGet(st,role,name) ?? tryGet(st,role,"__DEFAULT__") ?? tryGet("ALL",role,name) ?? tryGet("ALL",role,"__DEFAULT__");
+  if(r==null) r = (p.mrp!=null) ? p.mrp : 0;
+  r=Number(r); return isFinite(r)?r:0;
+}
+function getCartItems(){
+  const items=[];
+  for(const p of products){
+    const qty=Number(cartQty[p.name]||0);
+    if(qty>0){
+      const rate=getRateFor(p);
+      items.push({...p, qty, rate, amount: rate*qty});
+    }
+  }
+  return items;
+}
+function recalcTotals(){
+  const items=getCartItems();
+  const sub=items.reduce((a,i)=>a+i.amount,0);
+  const gstPct=getGSTPercent();
+  const gst=sub*(gstPct/100);
+  const grand=sub+gst;
+
+  el("subTotal").textContent=money(sub);
+  el("gstTotal").textContent=money(gst);
+  el("grandTotal").textContent=money(grand);
+
+  const st=getState();
+  const isIntra=st && (st===SELLER_STATE);
+  if(!st){
+    el("gstSplit").textContent="—";
+    el("gstSplitHint").textContent="Select State to calculate GST split.";
+  }else if(isIntra){
+    const half=gst/2;
+    el("gstSplit").textContent=`CGST ${money(half)} + SGST ${money(half)}`;
+    el("gstSplitHint").textContent="Intra-state (Gujarat) billing.";
+  }else{
+    el("gstSplit").textContent=`IGST ${money(gst)}`;
+    el("gstSplitHint").textContent="Inter-state billing.";
+  }
+}
+function renderTable(){
+  const q=(el("search").value||"").toLowerCase().trim();
+  const role=getRole(), st=getState();
+
+  const filtered=products.filter(p=>{
+    if(!q) return true;
+    const blob=`${p.sr} ${p.name} ${p.strength} ${p.type} ${p.pack} ${p.category} ${p.class} ${p.indication}`.toLowerCase();
+    return blob.includes(q);
+  });
+
+  el("prodBody").innerHTML = filtered.map(p=>{
+    const qty=Number(cartQty[p.name]||0);
+    const mrpText=(p.mrp==null)?"—":`₹ ${p.mrp}/-`;
+    const rate=getRateFor(p);
+    const roleOk = role ? `<span class="tag">${role}</span>` : `<span class="tag warn">Select Category</span>`;
+    const stOk = st ? `<span class="tag">${st}</span>` : `<span class="tag warn">Select State</span>`;
+    return `
+      <tr>
+        <td>${p.sr}</td>
+        <td><b>${p.name}</b><div class="hint">${roleOk} ${stOk}</div></td>
+        <td>${p.strength}</td>
+        <td>${p.type}</td>
+        <td>${p.pack}</td>
+        <td>${p.category}</td>
+        <td>${p.class}</td>
+        <td>${p.indication}</td>
+        <td>${mrpText}</td>
+        <td>₹ ${rate.toFixed(2)}</td>
+        <td>
+          <div class="qtyBox">
+            <button class="qtyBtn" onclick="stepQty('${escapeQuotes(p.name)}',-1)">−</button>
+            <input class="qtyInput" type="number" min="0" value="${qty}" onchange="setQty('${escapeQuotes(p.name)}',this.value)">
+            <button class="qtyBtn" onclick="stepQty('${escapeQuotes(p.name)}',1)">+</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+window.stepQty = (name,delta)=>{ cartQty[name]=Math.max(0,Number(cartQty[name]||0)+delta); renderTable(); recalcTotals(); };
+window.setQty = (name,val)=>{ let n=Number(val); if(!isFinite(n)) n=0; cartQty[name]=Math.max(0,Math.floor(n)); renderTable(); recalcTotals(); };
+
+/* =========================
+   INVOICE NO (AUTO)
+========================= */
+const LS_INV = "aplsl_invoice_counter_v2";
+function getInvoiceNo(){
+  const manual=(el("invoiceNo").value||"").trim();
+  if(manual) return manual;
+  let c=0; try{ c=Number(localStorage.getItem(LS_INV)||"0"); }catch(e){}
+  c++; localStorage.setItem(LS_INV,String(c));
+  const d=new Date();
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,"0");
+  const day=String(d.getDate()).padStart(2,"0");
+  const seq=String(c).padStart(4,"0");
+  return `APLSL-INV-${y}${m}${day}-${seq}`;
+}
+
+/* =========================
+   ORDER BUILD + VALIDATION
+========================= */
+function validateBeforeCheckout(){
+  if(!session?.email) return "Please login first.";
+  if(!getRole()) return "Please select Category.";
+  if(!(el("partyName").value||"").trim()) return "Please enter Party/Name.";
+  const mob=(el("partyMobile").value||"").replace(/\D/g,"");
+  if(mob.length!==10) return "Please enter valid 10-digit Mobile No.";
+  if(!getState()) return "Please select State.";
+  if(getCartItems().length===0) return "Please add at least 1 item quantity.";
+  return "";
+}
+function buildOrder(){
+  const items=getCartItems();
+  const sub=items.reduce((a,i)=>a+i.amount,0);
+  const gstPct=getGSTPercent();
+  const gst=sub*(gstPct/100);
+  const grand=sub+gst;
+
+  const invNo=getInvoiceNo();
+  const invDate=el("invoiceDate").value || todayISO();
+
+  const st=getState();
+  const isIntra=st===SELLER_STATE;
+  const cgst=isIntra?gst/2:0;
+  const sgst=isIntra?gst/2:0;
+  const igst=isIntra?0:gst;
+
+  return {
+    createdAtISO: new Date().toISOString(),
+    createdAt: nowNice(),
+    invoiceNo: invNo,
+    invoiceDate: invDate,
+
+    loginEmail: session.email,
+    role: getRole(),
+
+    partyName: (el("partyName").value||"").trim(),
+    partyMobile: (el("partyMobile").value||"").trim(),
+    partyEmail: (el("partyEmail").value||"").trim(),
+    partyGSTIN: (el("partyGSTIN").value||"").trim(),
+    partyState: st,
+    partyAddress: (el("partyAddress").value||"").trim(),
+
+    gstPercent: gstPct,
+    subtotal: sub,
+    cgst, sgst, igst,
+    gstTotal: gst,
+    grandTotal: grand,
+
+    notes: (el("orderNotes").value||"").trim(),
+    items
+  };
+}
+function buildMessage(order){
+  const lines=[];
+  lines.push("🧾 APLSL B2B Order (Ahanitya Pharma Life Science LLP)");
+  lines.push(`Invoice No: ${order.invoiceNo}`);
+  lines.push(`Invoice Date: ${order.invoiceDate}`);
+  lines.push("");
+  lines.push("👤 Party Details");
+  lines.push(`Category: ${order.role}`);
+  lines.push(`Name: ${order.partyName}`);
+  lines.push(`Mobile: ${order.partyMobile}`);
+  if(order.partyEmail) lines.push(`Email: ${order.partyEmail}`);
+  if(order.partyGSTIN) lines.push(`GSTIN: ${order.partyGSTIN}`);
+  lines.push(`State: ${order.partyState}`);
+  if(order.partyAddress) lines.push(`Address: ${order.partyAddress}`);
+  lines.push("");
+  lines.push("💊 Items");
+  order.items.forEach((it,idx)=>{
+    lines.push(`${idx+1}) ${it.name} | ${it.strength} | Pack: ${it.pack} | Rate: ₹${it.rate.toFixed(2)} | Qty: ${it.qty} | Amt: ₹${it.amount.toFixed(2)}`);
+  });
+  lines.push("");
+  lines.push(`Subtotal: ₹${order.subtotal.toFixed(2)}`);
+  if(order.partyState===SELLER_STATE){
+    lines.push(`GST (${order.gstPercent}%): ₹${order.gstTotal.toFixed(2)} (CGST ₹${order.cgst.toFixed(2)} + SGST ₹${order.sgst.toFixed(2)})`);
+  }else{
+    lines.push(`GST (${order.gstPercent}%): ₹${order.gstTotal.toFixed(2)} (IGST ₹${order.igst.toFixed(2)})`);
+  }
+  lines.push(`Grand Total: ₹${order.grandTotal.toFixed(2)}`);
+  if(order.notes){ lines.push(""); lines.push("📝 Notes"); lines.push(order.notes); }
+  lines.push(""); lines.push(`Login Email: ${order.loginEmail}`);
+  lines.push(""); lines.push(`For Ahanitya: ${APLSL_EMAIL}`);
+  return lines.join("\n");
+}
+
+/* =========================
+   PDF
+========================= */
+async function generatePDF(order){
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ setCheckoutMsg("PDF library not loaded. Refresh page.", "bad"); return; }
+  const doc=new jsPDF("p","mm","a4");
+  const margin=12;
+
+  doc.setFont("helvetica","bold"); doc.setFontSize(14);
+  doc.text("Ahanitya Pharma Life Science LLP", margin, 16);
+  doc.setFont("helvetica","normal"); doc.setFontSize(10);
+  doc.text("B2B Medicine Order / Invoice", margin, 22);
+
+  doc.text(`Invoice No: ${order.invoiceNo}`, margin, 30);
+  doc.text(`Invoice Date: ${order.invoiceDate}`, margin, 35);
+  doc.text(`Category: ${order.role}`, margin, 40);
+
+  doc.text("Bill To:", margin, 48);
+  doc.setFont("helvetica","bold"); doc.text(order.partyName, margin, 53);
+  doc.setFont("helvetica","normal");
+  doc.text(`Mobile: ${order.partyMobile}`, margin, 58);
+  if(order.partyEmail) doc.text(`Email: ${order.partyEmail}`, margin, 63);
+  if(order.partyGSTIN) doc.text(`GSTIN: ${order.partyGSTIN}`, margin, 68);
+  doc.text(`State: ${order.partyState}`, margin, 73);
+  if(order.partyAddress) doc.text(`Address: ${order.partyAddress}`, margin, 78, {maxWidth:185});
+
+  const rows=order.items.map((it,i)=>[
+    String(i+1), it.name, it.strength, it.type, it.pack,
+    `₹${it.rate.toFixed(2)}`, String(it.qty), `₹${it.amount.toFixed(2)}`
+  ]);
+
+  doc.autoTable({
+    startY: order.partyAddress ? 86 : 82,
+    head: [["Sr","Product","Strength","Type","Pack","Rate","Qty","Amount"]],
+    body: rows,
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [17, 121, 154] },
+    margin: { left: margin, right: margin }
+  });
+
+  let y=doc.lastAutoTable.finalY+8;
+  doc.setFont("helvetica","bold");
+  doc.text(`Subtotal: ₹${order.subtotal.toFixed(2)}`, 140, y);
+  y+=6;
+  doc.setFont("helvetica","normal");
+  if(order.partyState===SELLER_STATE){
+    doc.text(`GST (${order.gstPercent}%): ₹${order.gstTotal.toFixed(2)} (CGST ₹${order.cgst.toFixed(2)} + SGST ₹${order.sgst.toFixed(2)})`, margin, y);
+  }else{
+    doc.text(`GST (${order.gstPercent}%): ₹${order.gstTotal.toFixed(2)} (IGST ₹${order.igst.toFixed(2)})`, margin, y);
+  }
+  y+=6;
+  doc.setFont("helvetica","bold");
+  doc.text(`Grand Total: ₹${order.grandTotal.toFixed(2)}`, 140, y);
+
+  doc.setFont("helvetica","normal"); doc.setFontSize(9);
+  doc.text("Generated from APLSL B2B Order Portal", margin, 290);
+
+  doc.save(`${order.invoiceNo}.pdf`);
+}
+
+/* =========================
+   AUTH via SheetDB
+   users columns recommended:
+   email | pass_hash | created_at
+========================= */
+async function signupSheetDB(email, pass){
+  const pass_hash = await sha256(pass);
+  // check if exists
+  const existing = await sheetSearch(SHEET_USERS, "email", email);
+  if(Array.isArray(existing) && existing.length > 0){
+    throw new Error("Account already exists. Please login.");
+  }
+  await sheetPost(SHEET_USERS, {
+    email,
+    pass_hash,
+    created_at: new Date().toISOString()
+  });
+}
+async function loginSheetDB(email, pass){
+  const rows = await sheetSearch(SHEET_USERS, "email", email);
+  if(!Array.isArray(rows) || rows.length === 0) throw new Error("Account not found. Please create account.");
+  const pass_hash = await sha256(pass);
+  const ok = String(rows[0].pass_hash || "") === pass_hash;
+  if(!ok) throw new Error("Invalid password.");
+  return true;
+}
+
+/* =========================
+   ORDER → SheetDB
+   orders columns recommended:
+   created_at | invoice_no | invoice_date | login_email | role | party_name | party_mobile | party_email | gstin | state | address
+   gst_percent | subtotal | cgst | sgst | igst | gst_total | grand_total | notes | items_json
+========================= */
+async function submitOrderToSheet(order){
+  const row = {
+    created_at: order.createdAtISO,
+    created_at_nice: order.createdAt,
+    invoice_no: order.invoiceNo,
+    invoice_date: order.invoiceDate,
+
+    login_email: order.loginEmail,
+    role: order.role,
+
+    party_name: order.partyName,
+    party_mobile: order.partyMobile,
+    party_email: order.partyEmail,
+    gstin: order.partyGSTIN,
+    state: order.partyState,
+    address: order.partyAddress,
+
+    gst_percent: order.gstPercent,
+    subtotal: order.subtotal,
+    cgst: order.cgst,
+    sgst: order.sgst,
+    igst: order.igst,
+    gst_total: order.gstTotal,
+    grand_total: order.grandTotal,
+
+    notes: order.notes,
+    items_json: JSON.stringify(order.items)
+  };
+  await sheetPost(SHEET_ORDERS, row);
+}
+
+async function loadHistoryFromSheet(){
+  if(!session?.email) return [];
+  const rows = await sheetSearch(SHEET_ORDERS, "login_email", session.email);
+  // sort newest first by created_at if available
+  if(Array.isArray(rows)){
+    rows.sort((a,b)=> String(b.created_at||"").localeCompare(String(a.created_at||"")));
+  }
+  return rows;
+}
+
+function renderHistory(rows){
+  if(!rows || rows.length===0){
+    el("orderHistory").innerHTML = `<tr><td colspan="7" class="muted">No orders found for this login.</td></tr>`;
+    return;
+  }
+  el("orderHistory").innerHTML = rows.map(r=>{
+    let itemsCount = 0;
+    try{ itemsCount = JSON.parse(r.items_json||"[]").length; }catch(e){}
+    return `
+      <tr>
+        <td>${(r.created_at_nice||"")}</td>
+        <td><b>${(r.invoice_no||"")}</b></td>
+        <td>${(r.role||"")}</td>
+        <td>${itemsCount}</td>
+        <td>${money(r.subtotal)}</td>
+        <td>${money(r.gst_total)}</td>
+        <td><b>${money(r.grand_total)}</b></td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function openWhatsApp(order){
+  const text = encodeURIComponent(buildMessage(order));
+  window.open(`https://wa.me/${DEST_WA}?text=${text}`, "_blank");
+}
+
+/* =========================
+   SESSION UI
+========================= */
+function syncSessionUI(){
+  const loggedIn = !!session?.email;
+  el("authBox").classList.toggle("hidden", loggedIn);
+  el("appBox").classList.toggle("hidden", !loggedIn);
+  el("btnLogout").disabled = !loggedIn;
+
+  if(loggedIn){
+    el("sessionPill").innerHTML = `Logged in: <b>${session.email}</b>`;
+    renderTable(); recalcTotals();
+    refreshHistory();
+  }else{
+    el("sessionPill").textContent = "Not logged in";
+    el("prodBody").innerHTML = "";
+    el("orderHistory").innerHTML = "";
+  }
+}
+
+async function refreshHistory(){
+  try{
+    setCheckoutMsg("Loading history from SheetDB…", "warn");
+    const rows = await loadHistoryFromSheet();
+    renderHistory(rows);
+    setCheckoutMsg("History updated.", "ok");
+  }catch(e){
+    setCheckoutMsg("History load failed: " + (e?.message||e), "bad");
+  }
+}
+
+/* =========================
+   INIT
+========================= */
+document.addEventListener("DOMContentLoaded", ()=>{
+  el("sheetdbTag").textContent = SHEETDB_BASE;
+  el("invoiceDate").value = todayISO();
+
+  el("btnSignup").addEventListener("click", async ()=>{
+    const email = (el("authEmail").value||"").trim().toLowerCase();
+    const pass  = (el("authPass").value||"").trim();
+    if(!email || !pass){ setAuthMsg("Email and Password are required.", "bad"); return; }
+    try{
+      setAuthMsg("Creating account…", "warn");
+      await signupSheetDB(email, pass);
+      setAuthMsg("✅ Account created. Now click Login.", "ok");
+    }catch(e){
+      setAuthMsg("❌ " + (e?.message||e), "bad");
+    }
+  });
+
+  el("btnLogin").addEventListener("click", async ()=>{
+    const email = (el("authEmail").value||"").trim().toLowerCase();
+    const pass  = (el("authPass").value||"").trim();
+    if(!email || !pass){ setAuthMsg("Email and Password are required.", "bad"); return; }
+    try{
+      setAuthMsg("Checking login…", "warn");
+      await loginSheetDB(email, pass);
+      session = { email, loginAt: new Date().toISOString() };
+      localStorage.setItem(LS_SESSION, JSON.stringify(session));
+      setAuthMsg("");
+      syncSessionUI();
+    }catch(e){
+      setAuthMsg("❌ " + (e?.message||e), "bad");
+    }
+  });
+
+  el("btnLogout").addEventListener("click", ()=>{
+    session=null;
+    localStorage.removeItem(LS_SESSION);
+    setCheckoutMsg("");
+    syncSessionUI();
+  });
+
+  el("btnClearLocal").addEventListener("click", ()=>{
+    cartQty = {};
+    el("invoiceNo").value = "";
+    el("orderNotes").value = "";
+    renderTable(); recalcTotals();
+    setCheckoutMsg("Local cart cleared.", "ok");
+  });
+
+  ["search","category","partyState","gstPercent"].forEach(id=>{
+    el(id).addEventListener("input", ()=>{ renderTable(); recalcTotals(); });
+    el(id).addEventListener("change", ()=>{ renderTable(); recalcTotals(); });
+  });
+
+  el("btnResetQty").addEventListener("click", ()=>{
+    cartQty = {};
+    renderTable(); recalcTotals();
+    setCheckoutMsg("Quantities reset.", "ok");
+  });
+
+  el("btnLoadDemoRates").addEventListener("click", ()=>{
+    setCheckoutMsg("Sample rates already loaded in code. Edit companyRatesByRole for final rates.", "ok");
+    renderTable(); recalcTotals();
+  });
+
+  el("btnPreview").addEventListener("click", ()=>{
+    const err=validateBeforeCheckout();
+    if(err){ setCheckoutMsg(err, "bad"); return; }
+    const order=buildOrder();
+    alert(buildMessage(order));
+    setCheckoutMsg("Preview opened.", "ok");
+  });
+
+  el("btnPDF").addEventListener("click", async ()=>{
+    const err=validateBeforeCheckout();
+    if(err){ setCheckoutMsg(err, "bad"); return; }
+    const order=buildOrder();
+    await generatePDF(order);
+    setCheckoutMsg("PDF generated.", "ok");
+  });
+
+  el("btnSubmitSheet").addEventListener("click", async ()=>{
+    const err=validateBeforeCheckout();
+    if(err){ setCheckoutMsg(err, "bad"); return; }
+    const order=buildOrder();
+
+    try{
+      setCheckoutMsg("Submitting order to SheetDB…", "warn");
+      await submitOrderToSheet(order);
+      setCheckoutMsg("✅ Order submitted & saved in Google Sheet!", "ok");
+      await refreshHistory();
+    }catch(e){
+      setCheckoutMsg("❌ Order submit failed: " + (e?.message||e), "bad");
+    }
+  });
+
+  el("btnWA").addEventListener("click", ()=>{
+    const err=validateBeforeCheckout();
+    if(err){ setCheckoutMsg(err, "bad"); return; }
+    const order=buildOrder();
+    openWhatsApp(order);
+    setCheckoutMsg("WhatsApp opened.", "ok");
+  });
+
+  el("btnRefreshHistory").addEventListener("click", refreshHistory);
+
+  syncSessionUI();
+});
 </script>
 </body>
 </html>
